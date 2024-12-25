@@ -8,6 +8,8 @@ CNetwork::CNetwork(void)
     m_dSimTime = 0;
     FaultTime = -1;
     m_step = 0;
+    m_routeFactory=make_unique<route::RouteFactory>(this);
+    m_routeStrategy=std::move(m_routeFactory->CreateStrategy(route::RouteType_Bfs));
     currentRouteAlg = [this](NODEID sourceId, NODEID sinkId, list<NODEID>& nodeList, list<LINKID>& linkList) -> bool
     {
         return this->ShortestPath(sourceId, sinkId, nodeList, linkList);
@@ -545,7 +547,7 @@ void CNetwork::InitRelayPath(DEMANDID demandId)
     //更新nextnode
     // 调用 路由函数，寻找从 sourceId 到 sinkId 的最短/负载均衡路径
     // cout << "Demand "<<demandId<<" is rerouting"<< endl;
-    if (currentRouteAlg(sourceId, sinkId, nodeList, linkList))
+    if (m_routeStrategy->Route(sourceId, sinkId, nodeList, linkList))
     {
         if(m_dSimTime>0)
         {

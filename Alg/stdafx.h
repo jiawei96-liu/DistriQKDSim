@@ -24,12 +24,13 @@
 #include <sstream>
 #include <fstream>
 #include <iostream>
-#include <Windows.h>
+// #include <Windows.h>
 #include <algorithm>
 #include <time.h>
 class CNetwork;
 using namespace std;
 
+typedef unsigned int UINT;
 
 typedef UINT NODEID;
 typedef UINT LINKID;

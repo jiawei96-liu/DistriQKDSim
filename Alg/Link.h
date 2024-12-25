@@ -2,7 +2,7 @@
 #include <random>
 #include <ctime>
 #include <unordered_set>
-#include "StdAfx.h"
+#include "stdafx.h"
 #include "KeyManager.h"
 class CLink
 {

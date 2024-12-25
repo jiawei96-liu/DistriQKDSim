@@ -1,11 +1,13 @@
 ﻿#pragma once
-#include "StdAfx.h"
+#include "stdafx.h"
 #include "Node.h"
 #include "Link.h"
 #include "Demand.h"
 #include "NetEvent.h"
 //#include "KeyManager.h"
+#include"RouteFactory.h"
 #include <functional>
+
 
 class CNetwork
 {
@@ -37,6 +39,8 @@ private:
     UINT m_uiDemandNum;	// 网络中的需求数量
     TIME m_dSimTime;	// 当前模拟时间
     UINT m_step;        // 执行步数
+    std::unique_ptr<route::RouteFactory> m_routeFactory;
+    std::unique_ptr<route::RouteStrategy> m_routeStrategy;
 
 public:
     void SetNodeNum(UINT nodeNum);
@@ -98,6 +102,7 @@ public:
     // 切换算法
     void setShortestPath()
     {
+        m_routeStrategy=std::move(m_routeFactory->CreateStrategy(route::RouteType_Bfs)); 
         currentRouteAlg = [this](NODEID sourceId, NODEID sinkId, list<NODEID>& nodeList, list<LINKID>& linkList) -> bool
         {
             return this->ShortestPath(sourceId, sinkId, nodeList, linkList);

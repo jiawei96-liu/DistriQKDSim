@@ -1,5 +1,5 @@
 ﻿#pragma once
-#include "StdAfx.h"
+#include "stdafx.h"
 #include "RelayPath.h"
 class CDemand
 {

@@ -1,6 +1,6 @@
 ﻿#pragma once
 #include <unordered_map>
-#include "StdAfx.h"
+#include "stdafx.h"
 class CNode
 {
 public:
