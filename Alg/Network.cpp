@@ -1,16 +1,20 @@
 ﻿#include "Network.h"
 #include "Link.h"
 #include <iostream>
+#include <chrono>
+#include <queue>
 
 CNetwork::CNetwork(void)
 {
     m_dSimTime = 0;
     FaultTime = -1;
     m_step = 0;
-    currentRouteAlg = [this](NODEID sourceId, NODEID sinkId, list<NODEID>& nodeList, list<LINKID>& linkList) -> bool
-    {
-        return this->ShortestPath(sourceId, sinkId, nodeList, linkList);
-    };
+    // currentRouteAlg = [this](NODEID sourceId, NODEID sinkId, list<NODEID>& nodeList, list<LINKID>& linkList) -> bool
+    // {
+    //     return this->ShortestPath(sourceId, sinkId, nodeList, linkList);
+    // };
+    m_routeFactory=make_unique<route::RouteFactory>(this);
+    m_routeStrategy=std::move(m_routeFactory->CreateStrategy(route::RouteType_Bfs));
     currentScheduleAlg = [this](NODEID nodeId, map<DEMANDID, VOLUME>& relayDemands) -> TIME
     {
         return this->MinimumRemainingTimeFirst(nodeId, relayDemands);
@@ -281,67 +285,151 @@ bool CNetwork::ShortestPath(NODEID sourceId, NODEID sinkId, list<NODEID> &nodeLi
 }
 
 // 只考虑keyrate的基于Dijkstra的最短路算法
-bool CNetwork::KeyRateShortestPath(NODEID sourceId, NODEID sinkId, list<NODEID>& nodeList, list<LINKID>& linkList)
-{
-    UINT NodeNum = static_cast<UINT>(m_vAllNodes.size());
-    vector<NODEID> preNode(NodeNum, sourceId);	// 记录每个节点在最短路径中的前驱节点
-    vector<RATE> curDist(NodeNum, INF);	// 用于记录从 sourceId 到各节点的当前最短距离
-    vector<bool> visited(NodeNum, false);	// 用于记录每个节点是否已被访问
-    curDist[sourceId] = 0;
-    visited[sourceId] = true;
-    NODEID curNode = sourceId;
-    while (curNode != sinkId)
-    {
-        for (auto adjNodeIter = m_vAllNodes[curNode].m_lAdjNodes.begin(); adjNodeIter != m_vAllNodes[curNode].m_lAdjNodes.end(); adjNodeIter++)
-        {
-            if (visited[*adjNodeIter])
-            {
-                continue;
-            }
-            LINKID midLink = m_mNodePairToLink[make_pair(curNode, *adjNodeIter)];
-            if (curDist[curNode] + m_vAllLinks[midLink].GetQKDRate() < curDist[*adjNodeIter])
-            {
-                curDist[*adjNodeIter] = curDist[curNode] + m_vAllLinks[midLink].GetQKDRate();
-                preNode[*adjNodeIter] = curNode;
-            }
-        }
-        //Find next node
-        RATE minDist = INF;
-        NODEID nextNode = curNode;
-        for (NODEID nodeId = 0; nodeId < NodeNum; nodeId++)
-        {
-            if (visited[nodeId])
-            {
-                continue;
-            }
-            if (curDist[nodeId] < minDist)
-            {
-                nextNode = nodeId;
-                minDist = curDist[nodeId];
-            }
-        }
-        if (minDist >= INF || nextNode == curNode)
-        {
+// bool CNetwork::KeyRateShortestPath(NODEID sourceId, NODEID sinkId, list<NODEID>& nodeList, list<LINKID>& linkList)
+// {
+//     UINT NodeNum = static_cast<UINT>(m_vAllNodes.size());
+//     vector<NODEID> preNode(NodeNum, sourceId);	// 记录每个节点在最短路径中的前驱节点
+//     vector<RATE> curDist(NodeNum, INF);	// 用于记录从 sourceId 到各节点的当前最短距离
+//     vector<bool> visited(NodeNum, false);	// 用于记录每个节点是否已被访问
+//     curDist[sourceId] = 0;
+//     visited[sourceId] = true;
+//     NODEID curNode = sourceId;
+//     while (curNode != sinkId)
+//     {
+//         for (auto adjNodeIter = m_vAllNodes[curNode].m_lAdjNodes.begin(); adjNodeIter != m_vAllNodes[curNode].m_lAdjNodes.end(); adjNodeIter++)
+//         {
+//             if (visited[*adjNodeIter])
+//             {
+//                 continue;
+//             }
+//             LINKID midLink = m_mNodePairToLink[make_pair(curNode, *adjNodeIter)];
+//             if (curDist[curNode] + m_vAllLinks[midLink].GetQKDRate() < curDist[*adjNodeIter])
+//             {
+//                 curDist[*adjNodeIter] = curDist[curNode] + m_vAllLinks[midLink].GetQKDRate();
+//                 preNode[*adjNodeIter] = curNode;
+//             }
+//         }
+//         //Find next node
+//         RATE minDist = INF;
+//         NODEID nextNode = curNode;
+//         for (NODEID nodeId = 0; nodeId < NodeNum; nodeId++)
+//         {
+//             if (visited[nodeId])
+//             {
+//                 continue;
+//             }
+//             if (curDist[nodeId] < minDist)
+//             {
+//                 nextNode = nodeId;
+//                 minDist = curDist[nodeId];
+//             }
+//         }
+//         if (minDist >= INF || nextNode == curNode)
+//         {
+//             return false;
+//         }
+//         curNode = nextNode;
+//         visited[nextNode] = true;
+//     }
+//     if (curNode != sinkId)
+//     {
+//         cout << "why current node is not sink node?? check function shortestPath!" << endl;
+//         getchar();
+//         exit(0);
+//     }
+//     while(curNode != sourceId)
+//     {
+//         nodeList.push_front(curNode);
+//         NODEID pre = preNode[curNode];
+//         LINKID midLink = m_mNodePairToLink[make_pair(pre, curNode)];
+//         linkList.push_front(midLink);
+//         curNode = pre;
+//     }
+//     nodeList.push_front(sourceId);
+//     return true;
+// }
+
+// //// 用二叉堆优化的只考虑keyrate的基于Dijkstra的最短路算法
+// bool CNetwork::KeyRateShortestPathWithBinHeap(NODEID sourceId, NODEID sinkId, list<NODEID>& nodeList, list<LINKID>& linkList)
+// {
+//     UINT NodeNum = static_cast<UINT>(m_vAllNodes.size());
+//     vector<NODEID> preNode(NodeNum, sourceId);   // 记录每个节点在最短路径中的前驱节点
+//     vector<RATE> curDist(NodeNum, INF);         // 从 sourceId 到各节点的当前最短距离
+//     vector<bool> visited(NodeNum, false);       // 用于记录每个节点是否已被访问
+//     curDist[sourceId] = 0;
+//     // 优先队列（小顶堆），存储 pair<距离, 节点ID>
+//     using PQNode = pair<RATE, NODEID>;
+//     priority_queue<PQNode, vector<PQNode>, greater<PQNode>> pq;
+//     pq.push({0, sourceId}); // 初始节点
+//     while (!pq.empty())
+//     {
+//         auto [curDistVal, curNode] = pq.top();
+//         pq.pop();
+//         // 如果当前节点已经访问过，跳过
+//         if (visited[curNode])
+//         {
+//             continue;
+//         }
+//         visited[curNode] = true;
+//         // 如果到达目标节点，停止搜索
+//         if (curNode == sinkId)
+//         {
+//             break;
+//         }
+//         // 遍历邻接节点
+//         for (auto adjNodeIter = m_vAllNodes[curNode].m_lAdjNodes.begin();
+//              adjNodeIter != m_vAllNodes[curNode].m_lAdjNodes.end();
+//              adjNodeIter++)
+//         {
+//             NODEID adjNode = *adjNodeIter;
+//             if (visited[adjNode])
+//             {
+//                 continue;
+//             }
+//             LINKID midLink = m_mNodePairToLink[make_pair(curNode, adjNode)];
+//             RATE newDist = curDist[curNode] + m_vAllLinks[midLink].GetQKDRate();
+//             // Relax 更新距离
+//             if (newDist < curDist[adjNode])
+//             {
+//                 curDist[adjNode] = newDist;
+//                 preNode[adjNode] = curNode;
+//                 pq.push({newDist, adjNode});
+//             }
+//         }
+//     }
+//     // 检查是否成功找到路径
+//     if (!visited[sinkId])
+//     {
+//         return false;
+//     }
+//     // 还原路径
+//     NODEID curNode = sinkId;
+//     while (curNode != sourceId)
+//     {
+//         nodeList.push_front(curNode);
+//         NODEID pre = preNode[curNode];
+//         LINKID midLink = m_mNodePairToLink[make_pair(pre, curNode)];
+//         linkList.push_front(midLink);
+//         curNode = pre;
+//     }
+//     nodeList.push_front(sourceId);
+//     return true;
+// }
+//判断两个List是否相等
+template <typename T>
+bool ListsEqual(const std::list<T>& list1, const std::list<T>& list2) {
+    if (list1.size() != list2.size()) {
+        return false;
+    }
+    auto it1 = list1.begin();
+    auto it2 = list2.begin();
+    while (it1 != list1.end() && it2 != list2.end()) {
+        if (*it1 != *it2) {
             return false;
         }
-        curNode = nextNode;
-        visited[nextNode] = true;
+        ++it1;
+        ++it2;
     }
-    if (curNode != sinkId)
-    {
-        cout << "why current node is not sink node?? check function shortestPath!" << endl;
-        getchar();
-        exit(0);
-    }
-    while(curNode != sourceId)
-    {
-        nodeList.push_front(curNode);
-        NODEID pre = preNode[curNode];
-        LINKID midLink = m_mNodePairToLink[make_pair(pre, curNode)];
-        linkList.push_front(midLink);
-        curNode = pre;
-    }
-    nodeList.push_front(sourceId);
     return true;
 }
 
@@ -447,7 +535,7 @@ void CNetwork::InitRelayPath(DEMANDID demandId)
     //更新nextnode
     // 调用 路由函数，寻找从 sourceId 到 sinkId 的最短/负载均衡路径
     // cout << "Demand "<<demandId<<" is rerouting"<< endl;
-    if (currentRouteAlg(sourceId, sinkId, nodeList, linkList))
+    if (m_routeStrategy->Route(sourceId, sinkId, nodeList, linkList))
     {
         if(m_dSimTime>0)
         {
@@ -520,11 +608,15 @@ void CNetwork::InitLinkDemand()
 void CNetwork::InitRelayPath()
 {
     cout << "Init Relay Path" << endl;
+    auto start = std::chrono::high_resolution_clock::now();
     for (auto demandIter = m_vAllDemands.begin(); demandIter != m_vAllDemands.end(); demandIter++)
     {
         InitRelayPath(demandIter->GetDemandId());
         cout << "Initing Relay Path for demand " << demandIter->GetDemandId() << endl;
     }
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+    std::cout << "InitRelayPath time: " << elapsed.count() << " seconds" << std::endl;
 }
 
 // 计算给定节点 nodeId 上最小剩余时间优先的需求转发时间，并记录将要转发的需求和数据量

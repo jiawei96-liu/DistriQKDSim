@@ -16,6 +16,9 @@ SOURCES += \
     Alg/Network.cpp \
     Alg/Node.cpp \
     Alg/RelayPath.cpp \
+    Alg/Route/KeyRateStrategy.cpp \
+    Alg/Route/BfsStrategy.cpp \
+    Alg/Route/RouteFactory.cpp \
     Alg/stdafx.cpp \
     GUI/progressbar.cpp \
     GUI/qkdsim.cpp \
@@ -30,8 +33,11 @@ HEADERS += \
     Alg/Network.h \
     Alg/Node.h \
     Alg/RelayPath.h \
+    Alg/Route/KeyRateStrategy.h \
     Alg/stdafx.h \
     Alg/targetver.h \
+    Alg/Route/BfsStrategy.h \
+    Alg/Route/RouteFactory.h \
     GUI/progressbar.h \
     GUI/qkdsim.h
 

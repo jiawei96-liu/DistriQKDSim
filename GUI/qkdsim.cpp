@@ -228,7 +228,8 @@ void QKDSim::on_bt_start_clicked()
     if (ui->bt_route1->isChecked())
         net->setShortestPath();
     else
-        net->setKeyRateShortestPath();
+        // net->setKeyRateShortestPath();
+        net->setKeyRateShortestPathWithBinHeap();
     if (ui->bt_schedule1->isChecked())
         net->setMinimumRemainingTimeFirst();
     else

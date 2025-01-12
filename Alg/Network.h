@@ -4,6 +4,7 @@
 #include "Link.h"
 #include "Demand.h"
 #include "NetEvent.h"
+#include "Alg/Route/RouteFactory.h"
 //#include "KeyManager.h"
 #include <functional>
 
@@ -37,6 +38,8 @@ private:
     UINT m_uiDemandNum;	// 网络中的需求数量
     TIME m_dSimTime;	// 当前模拟时间
     UINT m_step;        // 执行步数
+    std::unique_ptr<route::RouteFactory> m_routeFactory;    //路由策略工厂
+    std::unique_ptr<route::RouteStrategy> m_routeStrategy;  //当前路由策略
 
 public:
     void SetNodeNum(UINT nodeNum);
@@ -64,6 +67,7 @@ public:
     bool ShortestPath(NODEID sourceId, NODEID sinkId, list<NODEID>& nodeList, list<LINKID>& linkList);	// 用于计算从源节点到汇节点的最短路径，返回经过的节点和链路列表
     bool Load_Balance(NODEID sourceId, NODEID sinkId, list<NODEID>& nodeList, list<LINKID>& linkList);  // 负载均衡路由算法
     bool KeyRateShortestPath(NODEID sourceId, NODEID sinkId, list<NODEID>& nodeList, list<LINKID>& linkList);  // 权重为keyrate的最短路算法，返回经过的节点和链路列表
+    bool KeyRateShortestPathWithBinHeap(NODEID sourceId, NODEID sinkId, list<NODEID>& nodeList, list<LINKID>& linkList) ; //用二叉堆优化的keyrate最短路算法，返回经过的节点和链路列表
     //function for scheduling
     std::function<TIME(NODEID, map<DEMANDID, VOLUME>&)> currentScheduleAlg;
     TIME MinimumRemainingTimeFirst(NODEID nodeId, map<DEMANDID, VOLUME>& relayDemands); // 计算给定节点的需求转发执行时间
@@ -104,10 +108,18 @@ public:
     }
     void setKeyRateShortestPath()
     {
-        currentRouteAlg = [this](NODEID sourceId, NODEID sinkId, list<NODEID>& nodeList, list<LINKID>& linkList) -> bool
-        {
-            return this->KeyRateShortestPath(sourceId, sinkId, nodeList, linkList);
-        };
+        m_routeStrategy=std::move(m_routeFactory->CreateStrategy(route::RouteType_Bfs));
+        // currentRouteAlg = [this](NODEID sourceId, NODEID sinkId, list<NODEID>& nodeList, list<LINKID>& linkList) -> bool
+        // {
+        //     return this->KeyRateShortestPath(sourceId, sinkId, nodeList, linkList);
+        // };
+    }
+    void setKeyRateShortestPathWithBinHeap(){
+        m_routeStrategy=std::move(m_routeFactory->CreateStrategy(route::RouteType_KeyRateShortestPath));
+        // currentRouteAlg = [this](NODEID sourceId, NODEID sinkId, list<NODEID>& nodeList, list<LINKID>& linkList) -> bool
+        // {
+        //     return this->KeyRateShortestPathWithBinHeap(sourceId, sinkId, nodeList, linkList);
+        // };
     }
     void setMinimumRemainingTimeFirst()
     {
