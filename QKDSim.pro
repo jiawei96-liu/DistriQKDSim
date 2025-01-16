@@ -16,6 +16,8 @@ SOURCES += \
     Alg/Network.cpp \
     Alg/Node.cpp \
     Alg/RelayPath.cpp \
+    Alg/Route/BidBfsStrategy.cpp \
+    Alg/Route/KeyRateFibStrategy.cpp \
     Alg/Route/KeyRateStrategy.cpp \
     Alg/Route/BfsStrategy.cpp \
     Alg/Route/RouteFactory.cpp \
@@ -33,6 +35,9 @@ HEADERS += \
     Alg/Network.h \
     Alg/Node.h \
     Alg/RelayPath.h \
+    Alg/Route/BidBfsStrategy.h \
+    Alg/Route/FibonacciHeap.h \
+    Alg/Route/KeyRateFibStrategy.h \
     Alg/Route/KeyRateStrategy.h \
     Alg/stdafx.h \
     Alg/targetver.h \
