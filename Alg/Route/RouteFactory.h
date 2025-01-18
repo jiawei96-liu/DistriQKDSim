@@ -2,7 +2,7 @@
 #define ROUTE_FACTORY_H
 
 #include<memory>
-#include "Alg/StdAfx.h"
+#include "Alg/stdafx.h"
 
 class CNetwork;
 

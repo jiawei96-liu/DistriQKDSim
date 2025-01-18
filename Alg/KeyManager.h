@@ -1,6 +1,6 @@
 ﻿#pragma once
 #include <random>
-#include "StdAfx.h"
+#include "stdafx.h"
 class CKeyManager
 {
 public:
