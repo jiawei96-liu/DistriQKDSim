@@ -174,11 +174,11 @@ void QKDSim::readCSV(Kind kind) {
             double weight = std::get<6>(netw);
             double faultTime = std::get<7>(netw);
 
-            // 打印链路信息
-            std::cout << "Processing Link: " << linkId << std::endl;
-            std::cout << "  Source ID: " << sourceId << ", Sink ID: " << sinkId << std::endl;
-            std::cout << "  Key Rate: " << keyRate << ", Delay: " << proDelay << ", Bandwidth: " << bandWidth << std::endl;
-            std::cout << "  Weight: " << weight << ", Fault Time: " << faultTime << std::endl;
+            // // 打印链路信息
+            // std::cout << "Processing Link: " << linkId << std::endl;
+            // std::cout << "  Source ID: " << sourceId << ", Sink ID: " << sinkId << std::endl;
+            // std::cout << "  Key Rate: " << keyRate << ", Delay: " << proDelay << ", Bandwidth: " << bandWidth << std::endl;
+            // std::cout << "  Weight: " << weight << ", Fault Time: " << faultTime << std::endl;
 
             // 处理链路信息
             CLink newLink;
@@ -197,8 +197,8 @@ void QKDSim::readCSV(Kind kind) {
             net->m_mNodePairToLink[make_pair(sinkId, sourceId)] = linkId;
             net->InitKeyManagerOverLink(linkId);
 
-            // 打印相邻节点信息
-            std::cout << "  Adding " << sinkId << " as adjacent to " << sourceId << std::endl;
+            // // 打印相邻节点信息
+            // std::cout << "  Adding " << sinkId << " as adjacent to " << sourceId << std::endl;
             net->m_vAllNodes[sourceId].m_lAdjNodes.push_back(sinkId);
             net->m_vAllNodes[sinkId].m_lAdjNodes.push_back(sourceId);
 
@@ -228,10 +228,10 @@ void QKDSim::readCSV(Kind kind) {
             VOLUME demandVolume = std::get<3>(dem);
             TIME arriveTime = std::get<4>(dem);
 
-            // 打印需求信息
-            std::cout << "Processing Demand: " << demandId << std::endl;
-            std::cout << "  Source ID: " << sourceId << ", Sink ID: " << sinkId << std::endl;
-            std::cout << "  demandVolume: " << demandVolume << ", Arrive Time: " << arriveTime << std::endl;
+            // // 打印需求信息
+            // std::cout << "Processing Demand: " << demandId << std::endl;
+            // std::cout << "  Source ID: " << sourceId << ", Sink ID: " << sinkId << std::endl;
+            // std::cout << "  demandVolume: " << demandVolume << ", Arrive Time: " << arriveTime << std::endl;
 
             // 处理需求信息
             CDemand newDemand;

@@ -7,17 +7,10 @@ project(DistriQKDSim)
 # 设置 C++17 标准
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 # 设置输出目录
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-
-# 包含头文件目录
-include_directories(
-    ${PROJECT_SOURCE_DIR}/Alg  # 添加 Alg 文件夹下的头文件路径
-    ${PROJECT_SOURCE_DIR}/
-    ${PROJECT_SOURCE_DIR}/Route
-)
-
 
 # 设置源文件
 set(SOURCES
@@ -38,7 +31,7 @@ set(SOURCES
     Alg/Route/KeyRateFibStrategy.cpp
 )
 
-# 如果项目中有其他的头文件，可以显式地列出
+# 设置头文件
 set(HEADERS
     Alg/QKDSim.h
     Alg/Demand.h
@@ -62,10 +55,20 @@ set(HEADERS
 # 创建可执行文件
 add_executable(DistriQKDSim ${SOURCES})
 
-# 如果有额外的库依赖，可以在这里链接
-# 例如，链接 pthread 库（Linux 下可能需要）
+# 包含头文件目录
+target_include_directories(DistriQKDSim PRIVATE
+    ${PROJECT_SOURCE_DIR}/Alg  # 添加 Alg 文件夹下的头文件路径
+    ${PROJECT_SOURCE_DIR}/
+    ${PROJECT_SOURCE_DIR}/Route
+)
+
+# 链接线程库
 find_package(Threads REQUIRED)
 target_link_libraries(DistriQKDSim PRIVATE Threads::Threads)
 
-# 如果你有自定义的库，链接它们：
-# target_link_libraries(DistriQKDSim PRIVATE your_library_name)
+# 添加调试信息
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_compile_options(DistriQKDSim PRIVATE -g -O0)  # 启用调试符号，禁用优化
+else()
+    target_compile_options(DistriQKDSim PRIVATE -O2)  # 启用优化
+endif()
