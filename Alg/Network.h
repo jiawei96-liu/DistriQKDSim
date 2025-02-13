@@ -76,6 +76,10 @@ public:
     std::function<TIME(NODEID, map<DEMANDID, VOLUME>&)> currentScheduleAlg;
     TIME MinimumRemainingTimeFirst(NODEID nodeId, map<DEMANDID, VOLUME>& relayDemands); // 计算给定节点的需求转发执行时间
     TIME AverageKeyScheduling(NODEID nodeId, map<DEMANDID, VOLUME>& relayDemands); // 计算给定节点的需求转发执行时间
+    //link based基于链路
+    TIME MinimumRemainingTimeFirstLinkBased(LINKID linkId, map<DEMANDID, VOLUME> &relayDemands);
+    TIME FindDemandToRelayLinkBased(map<NODEID, map<DEMANDID, VOLUME>> &relayDemand);
+
 
 public:
     //functions for relay routing	初始化指定需求或所有需求的中继路径
