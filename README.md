@@ -1,6 +1,65 @@
-# QKDSim
+# QKDSim 
+# 1.Web版编译与部署
+## 1.1 安装依赖库oatpp-1.3.0版本
 
-## 编译运行
+前置条件
+```
+Git
+C++ compiler supporting C++ version >= 11.
+Make
+CMake version >= 3.1
+```
+
+安装oatpp-1.3.0
+```bash
+git clone --branch 1.3.0 --single-branch https://github.com/oatpp/oatpp.git
+
+cd oatpp/
+
+mkdir build && cd build
+
+cmake ..
+make install
+```
+
+正常会安装在`/usr/local/lib/oatpp-1.3.0/`目录下，若不是则后续编译QKDSim需要修改CMakeLists
+
+## 1.2 编译QKDSim Web版
+```bash
+mkdir build
+cd build
+cmake ..
+make
+```
+
+## 1.3 运行QKDSim Web版
+```
+cd build #一定要在build目录下运行
+./Web/webapp
+```
+
+随后访问http://localhost:8080即可
+
+## 1.4 修改部署的IP和端口
+`Web/AppComponent.hpp`
+
+```cpp
+class AppComponent {
+public:
+  
+  /**
+   *  Create ConnectionProvider component which listens on the port
+   */
+  OATPP_CREATE_COMPONENT(std::shared_ptr<oatpp::network::ServerConnectionProvider>, serverConnectionProvider)([] {
+    return oatpp::network::tcp::server::ConnectionProvider::createShared({"0.0.0.0", 8080, oatpp::network::Address::IP_4});
+  }());
+```
+
+
+
+
+
+# 2.非Web版编译运行
 ```
 mkdir build
 cd build

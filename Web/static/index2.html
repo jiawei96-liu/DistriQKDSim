@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Upload</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .container {
+            width: 400px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        .file-input {
+            margin: 10px 0;
+        }
+        .btn {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .btn:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Upload a File</h1>
+    <form id="uploadForm">
+        <input type="file" id="fileInput" class="file-input" accept="*/*" required><br>
+        <button type="button" class="btn" onclick="uploadFile()">Upload</button>
+    </form>
+    <div id="statusMessage"></div>
+</div>
+
+<script>
+    function uploadFile() {
+        const fileInput = document.getElementById("fileInput");
+        const file = fileInput.files[0];
+        if (!file) {
+            alert("Please select a file to upload.");
+            return;
+        }
+
+        // Create a new FormData object
+        const formData = new FormData();
+        formData.append("file", file);
+
+        // Make the fetch request to your backend API
+        fetch("/api/v1/file/demands/upload", {
+            method: "POST",
+            body: formData,
+        })
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById("statusMessage").textContent = "File uploaded successfully!";
+            console.log("Success:", data);
+        })
+        .catch(error => {
+            document.getElementById("statusMessage").textContent = "Error uploading file.";
+            console.error("Error:", error);
+        });
+    }
+</script>
+
+</body>
+</html>

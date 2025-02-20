@@ -75,6 +75,7 @@ public:
     //function for scheduling
     std::function<TIME(NODEID, map<DEMANDID, VOLUME>&)> currentScheduleAlg;
     TIME MinimumRemainingTimeFirst(NODEID nodeId, map<DEMANDID, VOLUME>& relayDemands); // 计算给定节点的需求转发执行时间
+    TIME MinimumRemainingTimeFirstLinkBased(LINKID linkId, map<DEMANDID, VOLUME> &relayDemands);
     TIME AverageKeyScheduling(NODEID nodeId, map<DEMANDID, VOLUME>& relayDemands); // 计算给定节点的需求转发执行时间
 
 public:
@@ -92,6 +93,7 @@ public:
 
     TIME FindDemandToRelay(NODEID nodeId, map<DEMANDID, VOLUME>& relayDemand);	// 确定应转发的需求，并计算所需的时间
     TIME FindDemandToRelay(map<NODEID, map<DEMANDID, VOLUME>>& relayDemand);
+    TIME FindDemandToRelayLinkBased(map<NODEID, map<DEMANDID, VOLUME>> &relayDemand);
     void RelayForOneHop(TIME executeTime, map<NODEID, map<DEMANDID, VOLUME>>& relayDemands); // 执行一次需求转发操作，中继到下一跳
     void UpdateRemainingKeys(TIME executionTime);	// 更新链路上剩余的密钥量
     void UpdateRemainingKeys(TIME executionTime, TIME m_dSimTime);	// 更新链路上剩余的密钥量
@@ -105,14 +107,15 @@ public:
     // 切换算法
     void setShortestPath()
     {
-        currentRouteAlg = [this](NODEID sourceId, NODEID sinkId, list<NODEID>& nodeList, list<LINKID>& linkList) -> bool
-        {
-            return this->ShortestPath(sourceId, sinkId, nodeList, linkList);
-        };
+        m_routeStrategy=std::move(m_routeFactory->CreateStrategy(route::RouteType_Bfs));
+        // currentRouteAlg = [this](NODEID sourceId, NODEID sinkId, list<NODEID>& nodeList, list<LINKID>& linkList) -> bool
+        // {
+        //     return this->ShortestPath(sourceId, sinkId, nodeList, linkList);
+        // };
     }
     void setKeyRateShortestPath()
     {
-        m_routeStrategy=std::move(m_routeFactory->CreateStrategy(route::RouteType_Bfs));
+        m_routeStrategy=std::move(m_routeFactory->CreateStrategy(route::RouteType_KeyRateShortestPath));
         // currentRouteAlg = [this](NODEID sourceId, NODEID sinkId, list<NODEID>& nodeList, list<LINKID>& linkList) -> bool
         // {
         //     return this->KeyRateShortestPath(sourceId, sinkId, nodeList, linkList);

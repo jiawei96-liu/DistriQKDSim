@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>网络拓扑与需求管理</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        .container {
+            width: 100%;         /* 设置宽度为100% */
+            margin: 0 auto;      /* 去掉外边距 */
+            padding: 20px;       /* 可以根据需要调整内边距 */
+        }
+        .result {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            height: 500px; /* 设置固定高度 */
+            overflow: hidden;
+            position: relative;
+        }
+        .result-content {
+            overflow-y: scroll; /* 启用垂直滚动 */
+            flex-grow: 1;
+            padding-right: 10px;
+        }
+        .card-body {
+            padding: 20px;
+        }
+        .modal-content {
+            padding: 20px;
+        }
+        .modal-body {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        table thead {
+            position: sticky;
+            top: 0;
+            background-color: #f8f9fa;  /* 设置背景色，避免透明 */
+            z-index: 2;  /* 确保表头在内容的上面 */
+            box-shadow: 0 2px 2px -2px rgba(0, 0, 0, 0.2);  /* 可选：添加阴影效果来增强层次感 */
+        }
+
+        table td {
+            background-color: #fff;  /* 给表格的单元格设置白色背景，避免内容和表头重叠时颜色问题 */
+        }
+
+
+        /* table th, table td {
+            text-align: center;
+        } */
+        
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>网络拓扑与需求管理</h1>
+
+    <!-- 首页操作按钮 -->
+    <div class="card">
+        <div class="card-body d-flex justify-content-between align-items-center">
+            <div>
+                <h5 class="card-title">首页操作</h5>
+                <button id="getLinksBtn" class="btn btn-primary">获取拓扑信息</button>
+                <button id="getDemandsBtn" class="btn btn-primary">获取需求信息</button>
+            </div>
+            
+            <!-- 右侧按钮 -->
+            <div class="d-flex ms-auto">
+                <button id="selectLinkBtn" class="btn btn-warning me-2" data-bs-toggle="modal" data-bs-target="#selectLinkModal">选择拓扑文件</button>
+                <button id="selectDemandBtn" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#selectDemandModal">选择需求文件</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 显示操作结果 -->
+    <div id="result" class="result">
+        <div id="result-header"></div>
+        <div id="result-content" class="result-content"></div>
+    </div>
+
+    <!-- 选择拓扑和需求操作 -->
+    <!-- <div class="card mt-4">
+        <div class="card-body">
+            <h5 class="card-title">选择操作</h5>
+            <button id="selectLinkBtn" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#selectLinkModal">选择拓扑文件</button>
+            <button id="selectDemandBtn" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#selectDemandModal">选择需求文件</button>
+        </div>
+    </div> -->
+</div>
+
+<!-- 选择拓扑文件模态框 -->
+<div class="modal fade" id="selectLinkModal" tabindex="-1" aria-labelledby="selectLinkModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="selectLinkModalLabel">选择拓扑文件</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="linkFilesList">
+                <!-- 文件列表将动态加载 -->
+            </div>
+            <div class="modal-footer">
+                <input type="file" id="uploadLinkFile" class="form-control" />
+                <button id="uploadLinkFileBtn" class="btn btn-success">上传拓扑文件</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 选择需求文件模态框 -->
+<div class="modal fade" id="selectDemandModal" tabindex="-1" aria-labelledby="selectDemandModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="selectDemandModalLabel">选择需求文件</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="demandFilesList">
+                <!-- 文件列表将动态加载 -->
+            </div>
+            <div class="modal-footer">
+                <input type="file" id="uploadDemandFile" class="form-control" />
+                <button id="uploadDemandFileBtn" class="btn btn-success">上传需求文件</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const apiBaseUrl = "http://localhost:8080/api/v1";
+
+    // 获取拓扑信息
+    document.getElementById('getLinksBtn').addEventListener('click', async () => {
+        const response = await fetch(`${apiBaseUrl}/links`);
+        const data = await response.json();
+        displayLinks(data.items);
+    });
+
+    // 获取需求信息
+    document.getElementById('getDemandsBtn').addEventListener('click', async () => {
+        const response = await fetch(`${apiBaseUrl}/demands`);
+        const data = await response.json();
+        displayDemands(data.items);
+    });
+
+    // 显示拓扑信息表格
+    function displayLinks(data) {
+        const headerDiv=document.getElementById('result-header');
+        const contentDiv = document.getElementById('result-content');
+        let header= '<h3>拓扑信息</h3>'
+        let table = `<table class="table table-bordered">
+                         <thead>
+                             <tr>
+                                 <th>Link ID</th>
+                                 <th>Source ID</th>
+                                 <th>Sink ID</th>
+                                 <th>QKD Rate</th>
+                                 <th>Delay</th>
+                                 <th>Bandwidth</th>
+                                 <th>Fault Time</th>
+                                 <th>Weight</th>
+                             </tr>
+                         </thead>
+                         <tbody>`;
+        data.forEach(link => {
+            table += `
+                <tr>
+                    <td>${link.linkId}</td>
+                    <td>${link.sourceId}</td>
+                    <td>${link.sinkId}</td>
+                    <td>${link.qkdRate}</td>
+                    <td>${link.delay}</td>
+                    <td>${link.bandwidth}</td>
+                    <td>${link.faultTime}</td>
+                    <td>${link.weight}</td>
+                </tr>`;
+        });
+        table += `</tbody></table>`;
+        headerDiv.innerHTML=header;
+        contentDiv.innerHTML = table;
+    }
+
+    // 显示需求信息表格
+    function displayDemands(data) {
+        const headerDiv=document.getElementById('result-header');
+        const contentDiv = document.getElementById('result-content');
+        let header='<h3>需求信息</h3>'
+        let table = `<table class="table table-bordered">
+                         <thead>
+                             <tr>
+                                 <th>Demand ID</th>
+                                 <th>Source ID</th>
+                                 <th>Sink ID</th>
+                                 <th>Arrive Time</th>
+                                 <th>Complete Time</th>
+                                 <th>Demand Volume</th>
+                                 <th>Remaining Volume</th>
+                                 <th>Delivered Volume</th>
+                                 <th>All Delivered</th>
+                                 <th>Route Failed</th>
+                             </tr>
+                         </thead>
+                         <tbody>`;
+        data.forEach(demand => {
+            table += `
+                <tr>
+                    <td>${demand.demandId}</td>
+                    <td>${demand.sourceId}</td>
+                    <td>${demand.sinkId}</td>
+                    <td>${demand.arriveTime}</td>
+                    <td>${demand.completeTime}</td>
+                    <td>${demand.demandVolume}</td>
+                    <td>${demand.remainingVolume}</td>
+                    <td>${demand.deliveredVolume}</td>
+                    <td>${demand.allDelivered}</td>
+                    <td>${demand.routeFailed}</td>
+                </tr>`;
+        });
+        table += `</tbody></table>`;
+        headerDiv.innerHTML=header;
+        contentDiv.innerHTML = table;
+    }
+
+    // 获取拓扑文件列表并显示
+    async function loadLinkFiles() {
+        const response = await fetch(`${apiBaseUrl}/file/links`);
+        const data = await response.json();
+        let html = '<ul class="list-group">';
+        data.items.forEach(file => {
+            html += `
+                <li class="list-group-item d-flex justify-content-between">
+                    ${file}
+                    <button class="btn btn-sm btn-primary" onclick="selectLinkFile('${file}')">选择</button>
+                </li>
+            `;
+        });
+        html += '</ul>';
+        document.getElementById('linkFilesList').innerHTML = html;
+    }
+
+    // 获取需求文件列表并显示
+    async function loadDemandFiles() {
+        const response = await fetch(`${apiBaseUrl}/file/demands`);
+        const data = await response.json();
+        let html = '<ul class="list-group">';
+        data.items.forEach(file => {
+            html += `
+                <li class="list-group-item d-flex justify-content-between">
+                    ${file}
+                    <button class="btn btn-sm btn-primary" onclick="selectDemandFile('${file}')">选择</button>
+                </li>
+            `;
+        });
+        html += '</ul>';
+        document.getElementById('demandFilesList').innerHTML = html;
+    }
+
+    // 选择拓扑文件
+    async function selectLinkFile(fileName) {
+        const response=await fetch(`${apiBaseUrl}/select/link/${fileName}`, { method: 'POST' });
+        alert(`已选择拓扑文件: ${fileName}`);
+        loadLinkFiles(); // 更新文件列表
+        const data = await response.json();
+        displayLinks(data.items);
+    }
+
+    // 选择需求文件
+    async function selectDemandFile(fileName) {
+        const response=await fetch(`${apiBaseUrl}/select/demand/${fileName}`, { method: 'POST' });
+        alert(`已选择需求文件: ${fileName}`);
+        loadDemandFiles(); // 更新文件列表
+        const data = await response.json();
+        displayDemands(data.items);
+    }
+
+    // 上传拓扑文件
+    document.getElementById('uploadLinkFileBtn').addEventListener('click', async () => {
+        const file = document.getElementById('uploadLinkFile').files[0];
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const response = await fetch(`${apiBaseUrl}/file/links/upload`, {
+            method: 'POST',
+            body: formData
+        });
+        const data = await response.json();
+        alert('上传拓扑文件成功');
+        loadLinkFiles(); // 更新文件列表
+    });
+
+    // 上传需求文件
+    document.getElementById('uploadDemandFileBtn').addEventListener('click', async () => {
+        const file = document.getElementById('uploadDemandFile').files[0];
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const response = await fetch(`${apiBaseUrl}/file/demands/upload`, {
+            method: 'POST',
+            body: formData
+        });
+        const data = await response.json();
+        alert('上传需求文件成功');
+        loadDemandFiles(); // 更新文件列表
+    });
+
+    // 初始化加载文件列表
+    document.getElementById('selectLinkBtn').addEventListener('click', loadLinkFiles);
+    document.getElementById('selectDemandBtn').addEventListener('click', loadDemandFiles);
+
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+
+</body>
+</html>

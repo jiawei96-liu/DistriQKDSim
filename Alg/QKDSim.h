@@ -14,7 +14,10 @@ enum Kind { Network, Demand };
 
 class QKDSim {
 public:
-    QKDSim(CNetwork* net) : net(net) {}
+    QKDSim(CNetwork* net) : net(net) {
+        network=std::vector<std::tuple<int, int, int, double, double, double, double, double>>();
+        demand=std::vector<std::tuple<int, int, int, double, double>>();
+    }
 
     void loadCSV(const std::string& fileName, Kind kind);
     void readCSV(Kind kind);

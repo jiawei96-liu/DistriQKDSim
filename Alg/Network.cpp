@@ -3,6 +3,7 @@
 #include <iostream>
 #include <chrono>
 #include <queue>
+#include<memory>
 
 CNetwork::CNetwork(void)
 {
@@ -821,13 +822,13 @@ TIME CNetwork::MinimumRemainingTimeFirstLinkBased(LINKID linkId, map<DEMANDID, V
     map<DEMANDID, TIME> executeTimeDemand;         // 记录需求的执行时间
     VOLUME availableKeyVolume = m_vAllLinks[linkId].GetAvaialbeKeys();
     // 获取当前链路的首末端点
-    SourceId = m_vAllLinks[linkId].GetSourceId()
-    SinkId = m_vAllLinks[linkId].GetSinkId()
+    auto SourceId = m_vAllLinks[linkId].GetSourceId();
+    auto SinkId = m_vAllLinks[linkId].GetSinkId();
     RATE bandwidth = m_vAllLinks[linkId].GetBandwidth();
     // 遍历首末端点
-    map<DEMANDID, VOLUME>::iterator demandIter;
-    demandIter = m_vAllNodes[SourceId].m_mRelayVolume.begin();
-    for (; demandIter != m_vAllNodes[SourceId].m_mRelayVolume.end(); demandIter++)
+    auto demandIter = m_vAllNodes[SourceId].m_mRelayVolume.begin();
+    
+    for (; demandIter!= m_vAllNodes[SourceId].m_mRelayVolume.end(); demandIter++)
     {
         DEMANDID selectedDemand = demandIter->first;
         if (m_vAllDemands[selectedDemand].GetArriveTime() > m_dSimTime + SMALLNUM)
@@ -1062,7 +1063,7 @@ TIME CNetwork::FindDemandToRelayLinkBased(map<NODEID, map<DEMANDID, VOLUME>> &re
         map<DEMANDID, VOLUME> tempRelayDemand;
         TIME executeTime = FindDemandToRelay(linkId, tempRelayDemand);
         // 将每个节点的最小转发时间存储在 nodeRelayTime 中，并更新 minExecuteTime 以记录全网络的最小转发时间
-        linkRelayDemand[linkId] = executeTime;
+        linkRelayDemand[linkId] = tempRelayDemand;
         if (executeTime < minExecuteTime)
         {
             minExecuteTime = executeTime;
@@ -1084,15 +1085,15 @@ TIME CNetwork::FindDemandToRelayLinkBased(map<NODEID, map<DEMANDID, VOLUME>> &re
     linkIter = linkRelayDemand.begin();
     for (; linkIter != linkRelayDemand.end(); linkIter++)
     {
-        linkId = linkIter->first;
+        auto linkId = linkIter->first;
         map<DEMANDID, VOLUME>& demand_map = linkIter->second;
         // 遍历所有 DEMANDID 参数
         for (const auto& pair : demand_map) {
             DEMANDID demand_id = pair.first;
             // 获取当前链路的首末端点
-            SourceId = m_vAllLinks[linkId].GetSourceId();
-            SinkId = m_vAllLinks[linkId].GetSinkId();
-            map<DEMANDID, VOLUME>::iterator demandIter;
+            auto SourceId = m_vAllLinks[linkId].GetSourceId();
+            auto SinkId = m_vAllLinks[linkId].GetSinkId();
+            unordered_map<DEMANDID, VOLUME>::iterator demandIter;
             demandIter = m_vAllNodes[SourceId].m_mRelayVolume.begin();
             int succ_signal = 0;
             for (; demandIter != m_vAllNodes[SourceId].m_mRelayVolume.end(); demandIter++)
@@ -1111,7 +1112,7 @@ TIME CNetwork::FindDemandToRelayLinkBased(map<NODEID, map<DEMANDID, VOLUME>> &re
                         map<DEMANDID, VOLUME>& demand_map_temp = nodeRelayDemand[SourceId];
                         for (const auto& pair_temp : demand_map_temp)
                         {
-                            if(pair->second < pair_temp->second)
+                            if(pair.second < pair_temp.second)
                             {
                                 nodeRelayDemand[SourceId] = linkIter->second;
                                 nodeRelayTime[SourceId] = linkRelayTime[linkId];
@@ -1136,7 +1137,7 @@ TIME CNetwork::FindDemandToRelayLinkBased(map<NODEID, map<DEMANDID, VOLUME>> &re
                     map<DEMANDID, VOLUME>& demand_map_temp = nodeRelayDemand[SinkId];
                     for (const auto& pair_temp : demand_map_temp)
                     {
-                        if(pair->second < pair_temp->second)
+                        if(pair.second < pair_temp.second)
                         {
                             nodeRelayDemand[SinkId] = linkIter->second;
                             nodeRelayTime[SinkId] = linkRelayTime[linkId];
