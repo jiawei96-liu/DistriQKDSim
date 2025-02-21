@@ -11,14 +11,14 @@ int main() {
     // sim.QKDSim::loadCSV("../Input/10规模/network.csv", Network);
     // sim.QKDSim::loadCSV("../Input/network(500).csv", Network);
     // sim.QKDSim::loadCSV("../Input/network(1000).csv", Network);
-    sim.QKDSim::loadCSV("../Input/network(10000).csv", Network);
+    sim.QKDSim::loadCSV("/home/ustc-int/Desktop/wyy/DistriQKDSim/DistriQKDSim/Input/network(10000).csv", Network);
     sim.readCSV(Network);
 
     // 加载需求数据
     // sim.QKDSim::loadCSV("../Input/10规模/demand.csv", Demand);
     // sim.QKDSim::loadCSV("../Input/demand(500).csv", Demand);
     // sim.QKDSim::loadCSV("../Input/demand(1000).csv", Demand);
-    sim.QKDSim::loadCSV("../Input/demand(10000).csv", Demand);
+    sim.QKDSim::loadCSV("/home/ustc-int/Desktop/wyy/DistriQKDSim/DistriQKDSim/Input/demand(10000).csv", Demand);
     sim.readCSV(Demand);
 
     // 统计 InitRelayPath 函数的执行时间

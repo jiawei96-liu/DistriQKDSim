@@ -18,7 +18,11 @@ CNetwork::CNetwork(void)
     //     return this->ShortestPath(sourceId, sinkId, nodeList, linkList);
     // };
     m_routeFactory=make_unique<route::RouteFactory>(this);
-    m_routeStrategy=std::move(m_routeFactory->CreateStrategy(route::RouteType_Bfs));
+
+    // m_routeStrategy=std::move(m_routeFactory->CreateStrategy(route::RouteType_Bfs));    //BFS
+
+    m_routeStrategy=std::move(m_routeFactory->CreateStrategy(route::RouteType_KeyRateShortestPath));   //keyrate最短路策略
+
     currentScheduleAlg = [this](NODEID nodeId, map<DEMANDID, VOLUME>& relayDemands) -> TIME
     {
         return this->MinimumRemainingTimeFirst(nodeId, relayDemands);
@@ -810,6 +814,13 @@ TIME CNetwork::MinimumRemainingTimeFirst(NODEID nodeId, map<DEMANDID, VOLUME> &r
     map<LINKID, DEMANDID> scheduledDemand; // 记录每条链路上计划要转发的需求
     map<DEMANDID, TIME> executeTimeDemand; // 记录需求的执行时间
     // 遍历当前节点 nodeId 上的所有需求（记录在 m_mRelayVolume 中），跳过尚未到达的需求（通过到达时间判断）
+    // 创建一个随机数引擎
+    std::random_device rd;  // 用于获取随机种子
+    std::mt19937 gen(rd()); // 使用 Mersenne Twister 算法生成随机数
+    std::uniform_int_distribution<> dis(0, 1); // 定义一个分布，生成 0 或 1
+
+    // 生成随机数
+    int tempWait = dis(gen);
     for (auto demandIter = m_vAllNodes[nodeId].m_mRelayVolume.begin(); demandIter != m_vAllNodes[nodeId].m_mRelayVolume.end(); demandIter++)
     {
         DEMANDID selectedDemand = demandIter->first;
@@ -833,10 +844,19 @@ TIME CNetwork::MinimumRemainingTimeFirst(NODEID nodeId, map<DEMANDID, VOLUME> &r
         TIME demandExecuteTime = actualTransmittableVolume / bandwidth;
         // cout << "bandwidth:" << bandwidth << endl;
         // cout << "demandExecuteTime:" << actualTransmittableVolume / bandwidth << endl;
+        
+        if (demandExecuteTime < 3)
+        {
+            if (tempWait == 1)
+            {
+                m_vAllLinks[midLink].wait_or_not = true;
+                continue;
+            }
+        }
         if (demandExecuteTime < executeTime)
         {
 
-            if (demandExecuteTime < 3 && demandIter->second > availableKeyVolume)
+            if (demandIter->second > availableKeyVolume)
             {
                 m_vAllLinks[midLink].wait_or_not = true;
                 // TIME waitTime = (demandIter->second - availableKeyVolume) / m_vAllLinks[midLink].GetQKDRate();

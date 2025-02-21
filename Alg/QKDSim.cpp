@@ -205,7 +205,7 @@ void QKDSim::readCSV(Kind kind) {
             // 假设这部分用于处理故障时间
             if (faultTime > 0) {
                 net->m_mDemandArriveTime.insert(make_pair(faultTime, 1000000 + linkId));
-                std::cout << "  Fault time detected. Inserting into m_mDemandArriveTime." << std::endl;
+                std::cout << "  Fault time detected. Inserting into m_mDemandArriveTime." << faultTime << std::endl;
             }
         }
 
