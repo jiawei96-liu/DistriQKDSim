@@ -19,10 +19,13 @@ RouteFactory::~RouteFactory() {
 std::unique_ptr<RouteStrategy> RouteFactory::CreateStrategy(RouteStrategyType type) {
     if (type == RouteType_Bfs) {
         // std::cout << "Creating BFS Strategy\n";
+        cout << "BFS" << endl;
         return std::make_unique<BfsStrategy>(net);  //朴素BFS
         // return std::make_unique<BidBfsStrategy>(net);    //双向BFS
     }else if(type==RouteType_KeyRateShortestPath){
+        cout << "密钥速率Dijkstra" << endl;
         return std::make_unique<KeyRateStrategy>(net);  //二叉堆
+        
         // return std::make_unique<KeyRateFibStrategy>(net);    //斐波那契堆
     }else {
         std::cerr << "Unknown strategy type: " << type << std::endl;

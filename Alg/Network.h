@@ -77,11 +77,18 @@ public:
     TIME MinimumRemainingTimeFirst(NODEID nodeId, map<DEMANDID, VOLUME>& relayDemands); // 计算给定节点的需求转发执行时间
     TIME MinimumRemainingTimeFirstLinkBased(LINKID linkId, map<DEMANDID, VOLUME> &relayDemands);
     TIME AverageKeyScheduling(NODEID nodeId, map<DEMANDID, VOLUME>& relayDemands); // 计算给定节点的需求转发执行时间
+    //link based基于链路
+    TIME MinimumRemainingTimeFirstLinkBased(LINKID linkId, map<DEMANDID, VOLUME> &relayDemands);
+    TIME FindDemandToRelayLinkBased(map<NODEID, map<DEMANDID, VOLUME>> &relayDemand);
+
 
 public:
     //functions for relay routing	初始化指定需求或所有需求的中继路径
     void InitRelayPath(DEMANDID demandId);
-    void InitRelayPath();//for all demands
+    // void InitRelayPath();//for all demands
+
+    void InitRelayPath(size_t max_threads); // 带参数的版本
+
     void InitLinkDemand();
 
     // functions for relay rerouting  发生故障时的抗毁（重路由）功能

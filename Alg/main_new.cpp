@@ -9,19 +9,26 @@ int main() {
 
     // 加载网络数据
     // sim.QKDSim::loadCSV("../Input/10规模/network.csv", Network);
-    // sim.QKDSim::loadCSV("../Input/network.csv", Network);
-    sim.QKDSim::loadCSV("../Input/network(10000).csv", Network);
+    // sim.QKDSim::loadCSV("../Input/network(500).csv", Network);
+    // sim.QKDSim::loadCSV("../Input/network(1000).csv", Network);
+    sim.QKDSim::loadCSV("/home/ustc-int/Desktop/wyy/DistriQKDSim/DistriQKDSim/Input/network(10000).csv", Network);
     sim.readCSV(Network);
 
     // 加载需求数据
     // sim.QKDSim::loadCSV("../Input/10规模/demand.csv", Demand);
-    // sim.QKDSim::loadCSV("../Input/demand.csv", Demand);
-    sim.QKDSim::loadCSV("../Input/demand(10000).csv", Demand);
+    // sim.QKDSim::loadCSV("../Input/demand(500).csv", Demand);
+    // sim.QKDSim::loadCSV("../Input/demand(1000).csv", Demand);
+    sim.QKDSim::loadCSV("/home/ustc-int/Desktop/wyy/DistriQKDSim/DistriQKDSim/Input/demand(10000).csv", Demand);
     sim.readCSV(Demand);
 
     // 统计 InitRelayPath 函数的执行时间
     auto start = std::chrono::high_resolution_clock::now();
-    network.InitRelayPath();
+    // network.InitRelayPath();
+
+    // 设置最大线程数
+    size_t max_threads = 50;
+    network.InitRelayPath(max_threads); // 调用并行化的 InitRelayPath()
+    
     auto end_1 = std::chrono::high_resolution_clock::now();
 
     std::chrono::duration<double> elapsed_1 = end_1 - start;
