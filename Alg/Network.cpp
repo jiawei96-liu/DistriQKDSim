@@ -26,6 +26,7 @@ CNetwork::CNetwork(void)
     currentScheduleAlg = [this](NODEID nodeId, map<DEMANDID, VOLUME>& relayDemands) -> TIME
     {
         return this->MinimumRemainingTimeFirst(nodeId, relayDemands);
+        // return this->AverageKeyScheduling(nodeId, relayDemands);
     };
 }
 
@@ -69,7 +70,7 @@ void CNetwork::MoveSimTime(TIME executionTime)
     while (demandIter->first <= m_dSimTime + SMALLNUM)
     {
         demandIter = m_mDemandArriveTime.erase(demandIter); // erase 方法删除当前迭代器所指向的元素，并返回一个指向下一个元素的迭代器。
-        cout << "更新demand指针" << endl;
+        // cout << "更新demand指针" << endl;
         if (demandIter == m_mDemandArriveTime.end())
             break;
     }
@@ -792,6 +793,8 @@ void CNetwork::InitRelayPath(size_t max_threads = std::thread::hardware_concurre
             for (size_t j = start_index; j < end_index; ++j) {
                 DEMANDID demandId = m_vAllDemands[j].GetDemandId();
                 InitRelayPath(demandId); // 每个线程处理一个任务块
+
+                std::this_thread::sleep_for(std::chrono::milliseconds(400));
             }
         });
     }
@@ -1008,6 +1011,15 @@ TIME CNetwork::MinimumRemainingTimeFirstLinkBased(LINKID linkId, map<DEMANDID, V
 // 思路：应该是链路承担的所有需求
 TIME CNetwork::AverageKeyScheduling(NODEID nodeId, map<DEMANDID, VOLUME> &relayDemands)
 {
+    // 创建一个随机数引擎
+    std::random_device rd;  // 用于获取随机种子
+    std::mt19937 gen(rd()); // 使用 Mersenne Twister 算法生成随机数
+    std::uniform_int_distribution<> dis(0, 1); // 定义一个分布，生成 0 或 1
+
+    // 生成随机数
+    int tempWait = dis(gen);
+
+    // cout<<"进入平均密钥调度算法"<<endl;
     TIME executeTime = INF;                // 表示当前的最小执行时间
     // 遍历link
     for(auto &link : m_vAllLinks)
@@ -1017,6 +1029,7 @@ TIME CNetwork::AverageKeyScheduling(NODEID nodeId, map<DEMANDID, VOLUME> &relayD
         {
             continue;
         }
+        // cout<<"该节点存在链路"<<endl;
         // 跳过故障link和link上没需求的link
         // if (link.GetFaultTime() >= 0 && link.GetFaultTime() <= m_dSimTime || link.m_lCarriedDemands.empty())
         if (link.GetFaultTime() > 0 && link.GetFaultTime() <= m_dSimTime || link.m_lCarriedDemands.empty())
@@ -1034,11 +1047,13 @@ TIME CNetwork::AverageKeyScheduling(NODEID nodeId, map<DEMANDID, VOLUME> &relayD
         // 遍历link上的demand，得到一条链路上的执行时间
         for (auto &demandid : link.m_lCarriedDemands)
         {
+            // cout<<demandid<<endl;
             if (m_vAllDemands[demandid].GetArriveTime() > m_dSimTime + SMALLNUM)
             {
                 // this demand has not arrived yet
                 continue;
             }
+            // cout<<"该链路存在需求"<<endl;
             num_of_demand++;
             cout<< link.GetLinkId()<< "have demand" << demandid<<endl;
             NODEID nodeid;
@@ -1107,7 +1122,7 @@ TIME CNetwork::AverageKeyScheduling(NODEID nodeId, map<DEMANDID, VOLUME> &relayD
                 }
             }
         }
-        else if (availableKeyVolume >= 10)
+        else if (availableKeyVolume >= 50)
         {
             link.wait_or_not = false;
             for (auto &demandid : link.m_lCarriedDemands)
@@ -1140,15 +1155,196 @@ TIME CNetwork::AverageKeyScheduling(NODEID nodeId, map<DEMANDID, VOLUME> &relayD
             link.wait_or_not = true;
             tempTime = (needVolume - availableKeyVolume) / link.GetQKDRate();
         }
+        if (tempTime < 3)
+        {
+            // if (tempWait == 1)
+            // {
+            //     link.wait_or_not = true;
+            //     continue;
+            // }
+            link.wait_or_not = true;
+            executeTime = 3;
+            continue;
+        }
         if (tempTime < executeTime)
         {
             executeTime = tempTime;
         }
     }
-    // if(executeTime != INF)
-    //     cout << "executeTime:" << executeTime << endl;
+    if(executeTime != INF)
+        cout << "executeTime:" << executeTime << endl;
     return executeTime;
 }
+
+// TIME CNetwork::AverageKeyScheduling(LINKID linkId, map<DEMANDID, VOLUME> &relayDemands)
+// {
+//     // 创建一个随机数引擎
+//     std::random_device rd;  // 用于获取随机种子
+//     std::mt19937 gen(rd()); // 使用 Mersenne Twister 算法生成随机数
+//     std::uniform_int_distribution<> dis(0, 1); // 定义一个分布，生成 0 或 1
+
+//     // 生成随机数
+//     int tempWait = dis(gen);
+
+//     // m_vAllLinks[linkId]
+//     // cout<<"进入平均密钥调度算法"<<endl;
+//     TIME executeTime = INF;                // 表示当前的最小执行时间
+//     // 遍历link
+
+//     VOLUME availableKeyVolume = m_vAllLinks[linkId].GetAvaialbeKeys();
+//     RATE bandwidth = m_vAllLinks[linkId].GetBandwidth();
+//     NODEID sourceid =  m_vAllLinks[linkId].GetSourceId();
+//     NODEID sinkid =  m_vAllLinks[linkId].GetSinkId();
+//     TIME tempTime = INF;
+
+//     // 只遍历链路首或尾是该节点的链路
+//     if (link.GetSourceId() != nodeId && link.GetSinkId() != nodeId)
+//     {
+//         continue;
+//     }
+//     // cout<<"该节点存在链路"<<endl;
+//     // 跳过故障link和link上没需求的link
+//     // if (link.GetFaultTime() >= 0 && link.GetFaultTime() <= m_dSimTime || link.m_lCarriedDemands.empty())
+//     if (link.GetFaultTime() > 0 && link.GetFaultTime() <= m_dSimTime || link.m_lCarriedDemands.empty())
+//     {
+//         link.wait_or_not = true;
+//         continue;
+//     }
+    
+    
+//     int num_of_demand = 0;
+//     // 遍历link上的demand，得到一条链路上的执行时间
+//     for (auto &demandid : link.m_lCarriedDemands)
+//     {
+//         // cout<<demandid<<endl;
+//         if (m_vAllDemands[demandid].GetArriveTime() > m_dSimTime + SMALLNUM)
+//         {
+//             // this demand has not arrived yet
+//             continue;
+//         }
+//         // cout<<"该链路存在需求"<<endl;
+//         num_of_demand++;
+//         cout<< link.GetLinkId()<< "have demand" << demandid<<endl;
+//         NODEID nodeid;
+//         VOLUME relayVolume;
+//         auto &nextNode = m_vAllDemands[demandid].m_Path.m_mNextNode;
+//         // relayVolume就是找到的待传的数据，这个m_mRelayVolume在sourceid或sinkid上
+//         if (nextNode.count(sourceid) && nextNode[sourceid] == sinkid)
+//         {
+//             nodeid = sourceid;
+//             relayVolume = m_vAllNodes[nodeid].m_mRelayVolume[demandid];
+//         }
+//         else if (nextNode.count(sinkid) && nextNode[sinkid] == sourceid)
+//         {
+//             nodeid = sinkid;
+//             relayVolume = m_vAllNodes[nodeid].m_mRelayVolume[demandid];
+//         }
+//         // else
+//         // {
+//         //     throw 1;
+//         // }
+
+//         // 对一个demand，判断链路最小执行时间tempTime
+//         if (relayVolume / bandwidth < tempTime)
+//         {
+//             tempTime = relayVolume / bandwidth;
+//         }
+//         // cout << "relayVolume" << relayVolume<<endl;
+//         // cout << "bandwidth" << bandwidth<<endl;
+//         // cout << "tempTime" << tempTime<<endl;
+//     }
+//     // 没有可以传的需求
+//     if (num_of_demand == 0)
+//     {
+//         continue;
+//     }
+//     // 找到了该条链路上的最小执行时间tempTime，计算最小传输量，然后比较可用密钥量
+//     // VOLUME needVolume = tempTime * bandwidth * link.m_lCarriedDemands.size();
+//     VOLUME needVolume = tempTime * bandwidth * num_of_demand;
+//     // cout << "needVolume" << needVolume<<endl;
+//     // cout << "availableKeyVolume" << availableKeyVolume<<endl;
+//     // 如果可用密钥量足够，给每一个nodeid，赋值传同样的最小传输量
+//     if (needVolume <= availableKeyVolume)
+//     {
+//         link.wait_or_not = false;
+//         for (auto &demandid : link.m_lCarriedDemands)
+//         {
+//             NODEID nodeid;
+//             auto &nextNode = m_vAllDemands[demandid].m_Path.m_mNextNode;
+//             // relayVolume就是找到的待传的数据，这个m_mRelayVolume在sourceid或sinkid上
+//             if (nextNode.count(sourceid) && nextNode[sourceid] == sinkid)
+//             {
+//                 nodeid = sourceid;
+//             }
+//             else if (nextNode.count(sinkid) && nextNode[sinkid] == sourceid)
+//             {
+//                 nodeid = sinkid;
+//             }
+//             // else
+//             // {
+//             //     throw 1;
+//             // }
+//             // 对每一个可以传输的demand，给相应的nodeid传输最小传输量
+//             if (nodeid == nodeId)
+//             {
+//                 relayDemands[demandid] = tempTime * bandwidth;
+//             }
+//         }
+//     }
+//     else if (availableKeyVolume >= 50)
+//     {
+//         link.wait_or_not = false;
+//         for (auto &demandid : link.m_lCarriedDemands)
+//         {
+//             NODEID nodeid;
+//             auto &nextNode = m_vAllDemands[demandid].m_Path.m_mNextNode;
+//             // relayVolume就是找到的待传的数据，这个m_mRelayVolume在sourceid或sinkid上
+//             if (nextNode.count(sourceid) && nextNode[sourceid] == sinkid)
+//             {
+//                 nodeid = sourceid;
+//             }
+//             else if (nextNode.count(sinkid) && nextNode[sinkid] == sourceid)
+//             {
+//                 nodeid = sinkid;
+//             }
+//             // else
+//             // {
+//             //     throw 1;
+//             // }
+//             // 对每一个可以传输的demand，给相应的nodeid传输最小传输量
+//             if (nodeid == nodeId)
+//             {
+//                 // relayDemands[demandid] = availableKeyVolume / link.m_lCarriedDemands.size();
+//                 relayDemands[demandid] = availableKeyVolume / num_of_demand;
+//             }
+//         }
+//     }
+//     else
+//     {
+//         link.wait_or_not = true;
+//         tempTime = (needVolume - availableKeyVolume) / link.GetQKDRate();
+//     }
+//     if (tempTime < 3)
+//     {
+//         // if (tempWait == 1)
+//         // {
+//         //     link.wait_or_not = true;
+//         //     continue;
+//         // }
+//         link.wait_or_not = true;
+//         executeTime = 3;
+//         continue;
+//     }
+//     if (tempTime < executeTime)
+//     {
+//         executeTime = tempTime;
+//     }
+
+//     if(executeTime != INF)
+//         cout << "executeTime:" << executeTime << endl;
+//     return executeTime;
+// }
+
 
 // 为指定节点 nodeId 找到需要转发的需求，并计算所需时间
 TIME CNetwork::FindDemandToRelay(NODEID nodeId, map<DEMANDID, VOLUME> &relayDemand)

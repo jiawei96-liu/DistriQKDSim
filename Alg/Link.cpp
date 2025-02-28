@@ -20,7 +20,11 @@ CLink::CLink(const CLink& link)
     m_dDelay = link.m_dDelay;
     m_KeyManager = link.m_KeyManager;
     m_dBandwidth = link.m_dBandwidth;
-//    m_lCarriedDemands = link.m_lCarriedDemands;
+    
+    // 为啥给注释了
+    m_lCarriedDemands = link.m_lCarriedDemands;
+    
+    
     m_dFaultTime = link.m_dFaultTime;
 
     m_dWeight = link.m_dWeight;
@@ -38,7 +42,9 @@ void CLink::operator=(const CLink& link)
     m_dDelay = link.m_dDelay;
     m_KeyManager = link.m_KeyManager;
     m_dBandwidth = link.m_dBandwidth;
-//    m_lCarriedDemands = link.m_lCarriedDemands;
+    // 为啥给注释了
+    m_lCarriedDemands = link.m_lCarriedDemands;
+    
     m_dFaultTime = link.m_dFaultTime;
 
     m_dWeight = link.m_dWeight;
