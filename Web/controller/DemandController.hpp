@@ -39,9 +39,9 @@ public:
     {}
 public:
 
-    ENDPOINT("GET", "/api/v1/demands", getDemands) {
+    ENDPOINT("GET", "/api/v1/demands", getDemands,QUERY(UInt32, offset, "offset"),QUERY(UInt32, limit, "limit")) {
         //获取所有需求信息
-        auto result=netService->getAllDemands();
+        auto result=netService->getPageDemands(offset.getValue(0),limit.getValue(1000));
         return createDtoResponse(Status::CODE_200, result);
     }
 

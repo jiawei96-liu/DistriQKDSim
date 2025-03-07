@@ -7,10 +7,13 @@ add_executable(webapp
     Utils.cpp
 )
 
+find_package(Threads REQUIRED)
 # 链接Alg模块和Oat++库
 target_link_libraries(webapp
+    PRIVATE
     alg
     /usr/local/lib/oatpp-1.3.0/liboatpp.a
+    Threads::Threads
 )
 
 # 设置包含目录

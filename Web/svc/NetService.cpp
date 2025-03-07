@@ -1,5 +1,6 @@
 #include "Web/svc/NetService.hpp"
 #include <dirent.h>  // 用于读取目录
+#include <thread>
 
 std::unique_ptr<NetService> NetService::instance = nullptr;
 std::once_flag NetService::initFlag;
@@ -30,11 +31,44 @@ oatpp::Object<ListDto<oatpp::Object<DemandDto>>> NetService::getAllDemands(){
     return res;
 }
 
-oatpp::Object<ListDto<oatpp::Object<LinkDto>>> NetService::getAllLinks(){
-    auto res = ListDto<oatpp::Object<LinkDto>>::createShared();
+oatpp::Object<PageDto<oatpp::Object<DemandDto>>> NetService::getPageDemands(uint32_t offset=0,uint32_t limit=-1){
+    auto res = PageDto<oatpp::Object<DemandDto>>::createShared();
+    res->offset=offset;
+    res->limit=limit;
     res->items={};
-    res->count=network.m_vAllLinks.size();
-    for (auto& link:network.m_vAllLinks){
+    res->count=(unsigned int)0;
+    for (uint32_t i=offset;i<min(network.m_vAllLinks.size(),((size_t)offset+(size_t)limit));i++){
+        auto& dem=network.m_vAllDemands[i];
+        auto obj=DemandDto::createShared();
+        obj->demandId=dem.GetDemandId();
+        obj->sourceId=dem.GetSourceId();
+        obj->sinkId=dem.GetSinkId();
+        obj->arriveTime=dem.GetArriveTime();
+        obj->completeTime=dem.GetCompleteTime();
+        obj->demandVolume=dem.GetDemandVolume();
+        obj->remainingVolume=dem.GetRemainingVolume();
+        obj->deliveredVolume=dem.GetDeliveredVolume();
+        obj->allDelivered=dem.GetAllDelivered();
+        obj->routeFailed=dem.GetRoutedFailed();
+        res->items->push_back(obj);
+    }
+    res->count=network.m_vAllDemands.size();
+    // for(int i=0;i<3;i++){
+    //     auto obj=DemandDto::createShared();
+    //     obj->demandId=i;
+    //     res->items->push_back(obj);
+    // }
+    return res;
+}
+
+oatpp::Object<PageDto<oatpp::Object<LinkDto>>> NetService::getPageLinks(uint32_t offset=0,uint32_t limit=-1){
+    auto res = PageDto<oatpp::Object<LinkDto>>::createShared();
+    res->offset=offset;
+    res->limit=limit;
+    res->items={};
+    res->count=(unsigned int)0;
+    for(uint32_t i=offset;i<min(network.m_vAllLinks.size(),((size_t)offset+(size_t)limit));i++){
+        auto &link=network.m_vAllLinks[i];
         auto obj=LinkDto::createShared();
         obj->linkId=link.GetLinkId();
         obj->sourceId=link.GetSourceId();
@@ -46,6 +80,7 @@ oatpp::Object<ListDto<oatpp::Object<LinkDto>>> NetService::getAllLinks(){
         obj->weight=link.GetWeight();
         res->items->push_back(obj);
     }
+    res->count=network.m_vAllLinks.size();
     return res;
 }
 
@@ -234,7 +269,7 @@ bool NetService::start(int routeAlg,int scheduleAlg){
         return false;
     }
     
-    network.InitRelayPath();
+    network.InitRelayPath(std::thread::hardware_concurrency());
     return true;
 }
 

@@ -39,11 +39,11 @@ public:
     {}
 public:
 
-    ENDPOINT("GET", "/api/v1/links", getLinks) {
+    ENDPOINT("GET", "/api/v1/links", getLinks,QUERY(UInt32, offset, "offset"),QUERY(UInt32, limit, "limit")) {
         //获取所有链路拓扑信息
         netService=NetService::getInstance();
         auto dto = DemandDto::createShared();
-        auto result=netService->getAllLinks();
+        auto result=netService->getPageLinks(offset.getValue(0),limit.getValue(1000));
 
         return createDtoResponse(Status::CODE_200, result);
     }
@@ -58,8 +58,9 @@ public:
         //为仿真选择一个链路拓扑文件
         OATPP_LOGI("Select","Select Network %s",fileName.getValue("").c_str());
         netService->selectLinks(fileName.getValue(""));
-        auto result=netService->getAllLinks();
-        return createDtoResponse(Status::CODE_200,result);
+        // auto result=netService->getAllLinks();
+        // return createDtoResponse(Status::CODE_200,result);
+        return createResponse(Status::CODE_200,"OK");
     }
 
     ENDPOINT("POST", "api/v1/file/links/upload", uploadLinks, REQUEST(std::shared_ptr<IncomingRequest>, request)) {

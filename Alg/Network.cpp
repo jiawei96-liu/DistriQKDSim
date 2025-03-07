@@ -1547,6 +1547,8 @@ void CNetwork::RelayForOneHop(TIME executeTime, map<NODEID, map<DEMANDID, VOLUME
 
             // 找到当前节点和下一个节点之间的链路 minLink，并在该链路上消耗相应的密钥数量（等于转发的数据量）
             LINKID minLink = m_mNodePairToLink[make_pair(nodeIter->first, nextNode)];
+            cout<<"nextNode:"<<nextNode<<endl;
+            cout<<"minLink:"<<minLink<<endl;
             // if (m_vAllLinks[minLink].GetAvaialbeKeys() > THRESHOLD)
             if (m_vAllLinks[minLink].wait_or_not == false)
             {

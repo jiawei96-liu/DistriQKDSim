@@ -40,7 +40,9 @@ public:
 
     oatpp::Object<ListDto<oatpp::Object<DemandDto>>> getAllDemands();
 
-    oatpp::Object<ListDto<oatpp::Object<LinkDto>>> getAllLinks();
+    oatpp::Object<PageDto<oatpp::Object<DemandDto>>> getPageDemands(uint32_t offset,uint32_t limit);
+
+    oatpp::Object<PageDto<oatpp::Object<LinkDto>>> getPageLinks(uint32_t offset,uint32_t limit);
 
     oatpp::Object<ListDto<oatpp::String>> getDemandFileNames();
 

@@ -31,6 +31,17 @@ class SimStatusDto: public ListDto<oatpp::Object<SimResDto>> {
 
 };
 
+template<class T>
+class PageDto : public oatpp::DTO {
+
+    DTO_INIT(PageDto, DTO)
+
+    DTO_FIELD(UInt32, offset);
+    DTO_FIELD(UInt32, limit);
+    DTO_FIELD(UInt32, count); //总的个数
+    DTO_FIELD(Vector<T>, items);
+};
+
 
 
 #include OATPP_CODEGEN_END(DTO)

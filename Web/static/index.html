@@ -146,6 +146,13 @@
     <div id="result" class="result">
         <div id="result-header"></div>
         <div id="result-content" class="result-content"></div>
+        
+        <div id="pagination-controls" class="d-flex justify-content-center mt-3">
+            <button id="firstPage" class="btn btn-secondary me-2">首页</button>
+            <div id="pageNumbers" class="d-flex"></div>
+            <button id="lastPage" class="btn btn-secondary ms-2">尾页</button>
+        </div>
+        
     </div>
 
     <!-- 选择拓扑和需求操作 -->
@@ -198,19 +205,60 @@
 
 <script>
     const apiBaseUrl = "/api/v1";
+    const limit = 1000; // 每页 1000 条数据
+    let currentPage = 1;
+    let totalPages = 1; // 总页数
+    let currentDatasType="links"
 
     // 获取拓扑信息
     document.getElementById('getLinksBtn').addEventListener('click', async () => {
-        const response = await fetch(`${apiBaseUrl}/links`);
+        // const response = await fetch(`${apiBaseUrl}/links`);
+        // const data = await response.json();
+        // displayLinks(data.items);
+        currentDatasType="links";
+        currentPage=1;
+        fetchData()
+    });
+
+    async function fetchData() {
+    try {
+        const offset = (currentPage - 1) * limit;
+        const response = await fetch(`${apiBaseUrl}/`+currentDatasType+`?offset=${offset}&limit=${limit}`);
         const data = await response.json();
-        displayLinks(data.items);
+        totalPages = Math.ceil(data.count / limit); // 计算总页数
+        if(currentDatasType=="links"){
+            displayLinks(data.items);
+        }else if(currentDatasType=="demands"){
+            displayDemands(data.items);
+        }
+        updatePagination();
+    } catch (error) {
+        console.error("获取需求信息失败:", error);
+    }
+    }
+
+    document.getElementById('firstPage').addEventListener('click', () => {
+        if (currentPage !== 1) {
+            currentPage = 1;
+            fetchData();
+        }
+    });
+    document.getElementById('lastPage').addEventListener('click', () => {
+        if (currentPage !== totalPages) {
+            currentPage = totalPages;
+            fetchData();
+        }
     });
 
     // 获取需求信息
     document.getElementById('getDemandsBtn').addEventListener('click', async () => {
-        const response = await fetch(`${apiBaseUrl}/demands`);
-        const data = await response.json();
-        displayDemands(data.items);
+        // const response = await fetch(`${apiBaseUrl}/demands`);
+        // const data = await response.json();
+        // displayDemands(data.items);
+        
+        currentDatasType="demands";
+        currentPage=1;
+        fetchData()
     });
 
     //启动
@@ -391,8 +439,11 @@
         const response=await fetch(`${apiBaseUrl}/select/link/${fileName}`, { method: 'POST' });
         alert(`已选择拓扑文件: ${fileName}`);
         loadLinkFiles(); // 更新文件列表
-        const data = await response.json();
-        displayLinks(data.items);
+        // const data = await response.json();
+        // displayLinks(data.items);
+        currentDatasType="links";
+        currentPage=1;
+        fetchData()
     }
 
     // 选择需求文件
@@ -400,8 +451,37 @@
         const response=await fetch(`${apiBaseUrl}/select/demand/${fileName}`, { method: 'POST' });
         alert(`已选择需求文件: ${fileName}`);
         loadDemandFiles(); // 更新文件列表
-        const data = await response.json();
-        displayDemands(data.items);
+        // const data = await response.json();
+        // displayDemands(data.items);
+        currentDatasType="demands";
+        currentPage=1;
+        fetchData()
+    }
+
+    function updatePagination() {
+        const pageNumbersDiv = document.getElementById('pageNumbers');
+        pageNumbersDiv.innerHTML = "";
+
+        const maxPagesToShow = 5; // 最多显示 5 个页码
+        let startPage = Math.max(1, currentPage - 2);
+        let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+
+        if (endPage - startPage < maxPagesToShow - 1) {
+            startPage = Math.max(1, endPage - maxPagesToShow + 1);
+        }
+
+        for (let i = startPage; i <= endPage; i++) {
+            const pageBtn = document.createElement('button');
+            pageBtn.className = `btn ${i === currentPage ? 'btn-primary' : 'btn-light'} mx-1`;
+            pageBtn.innerText = i;
+            pageBtn.addEventListener('click', () => {
+                if (currentPage !== i) {
+                    currentPage = i;
+                    fetchData();
+                }
+            });
+            pageNumbersDiv.appendChild(pageBtn);
+        }
     }
 
     
