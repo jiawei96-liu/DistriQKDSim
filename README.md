@@ -24,7 +24,31 @@ make install
 
 正常会安装在`/usr/local/lib/oatpp-1.3.0/`目录下，若不是则后续编译QKDSim需要修改CMakeLists
 
-## 1.2 编译QKDSim Web版
+## 1.2 mysql驱动安装
+```
+sudo apt install libmysqlcppconn-dev
+```
+这个包会安装：
+
+    mysql_connection.h
+
+    mysql_driver.h
+
+    以及对应的动态库 libmysqlcppconn.so
+
+二、检查头文件和库
+
+检查是否已经安装成功：
+```
+ls /usr/include/cppconn/
+```
+会看到：driver.h、exception.h、prepared_statement.h 等。
+
+动态库位置：
+```
+ls /usr/lib/x86_64-linux-gnu/libmysqlcppconn.so
+```
+## 1.3 编译QKDSim Web版
 ```bash
 mkdir build
 cd build
@@ -32,7 +56,7 @@ cmake ..
 make
 ```
 
-## 1.3 运行QKDSim Web版
+## 1.4 运行QKDSim Web版
 ```
 cd build #一定要在build目录下运行
 ./Web/webapp
@@ -41,25 +65,69 @@ cd build #一定要在build目录下运行
 随后访问http://localhost:8080即可
 
 ## 1.4 修改部署的IP和端口
-`Web/AppComponent.hpp`
+`Config/config.txt`
 
-```cpp
-class AppComponent {
-public:
-  
-  /**
-   *  Create ConnectionProvider component which listens on the port
-   */
-  OATPP_CREATE_COMPONENT(std::shared_ptr<oatpp::network::ServerConnectionProvider>, serverConnectionProvider)([] {
-    return oatpp::network::tcp::server::ConnectionProvider::createShared({"0.0.0.0", 8080, oatpp::network::Address::IP_4});
-  }());
+```ini
+host=0.0.0.0 #部署ip 
+port=8080   #部署端口
+db_host=tcp://127.0.0.1:3306    #数据库ip和端口
+user=your_db_user   #db用户名
+password=your_password  #db密码
+scheme=QKDSIM_DB    
 ```
 
 
+# 2.数据库部署
+```
+sudo apt install mysql-server
+```
+
+```
+sudo systemctl status mysql
+
+看到 active (running) 表示运行正常。按 q 退出状态界面。
+```
+
+```
+sudo mysql
+
+创建用户名username和密码password_example
+>CREATE USER 'username'@'%' IDENTIFIED WITH mysql_native_password BY 'password_example';
+
+GRANT ALL PRIVILEGES ON *.* TO 'myuser'@'%' WITH GRANT OPTION;
+FLUSH PRIVILEGES;
+```
+说明：
+
+    '%' 代表允许任意 IP 访问。
+
+    如需限制为特定 IP，可将 % 替换为实际 IP 地址，如 'myuser'@'192.168.1.100'。
 
 
+## 修改配置文件以允许远程连接
+编辑 MySQL 配置文件：
+```
+sudo nano /etc/mysql/mysql.conf.d/mysqld.cnf
+```
+找到以下这一行：
 
-# 2.非Web版编译运行
+bind-address = 127.0.0.1
+
+将其改为：
+
+bind-address = 0.0.0.0
+
+## 重启mysql
+```
+sudo systemctl restart mysql
+```
+
+## 建表初始化
+```
+mysql -h 172.16.50.83 -u username -p < init.sql
+```
+
+# 3.非Web版编译运行
 ```
 mkdir build
 cd build
