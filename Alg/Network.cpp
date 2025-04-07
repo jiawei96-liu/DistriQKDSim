@@ -765,7 +765,7 @@ void CNetwork::InitLinkDemand()
 //     std::cout << "InitRelayPath time: " << elapsed.count() << " seconds" << std::endl;
 // }
 
-// 为所有需求初始化中继路径(并发)
+// 为所有需求初始化中继路径(并发)（多线程设计部分）
 void CNetwork::InitRelayPath(size_t max_threads = std::thread::hardware_concurrency()) {
     std::cout << "Init Relay Path" << std::endl;
     auto start = std::chrono::high_resolution_clock::now();
