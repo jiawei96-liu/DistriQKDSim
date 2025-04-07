@@ -16,7 +16,7 @@ class SimDao
 private:
     /* data */
 public:
-    SimDao(const std::string& host, const std::string& user, const std::string& password, const std::string& database);
+    SimDao();
     ~SimDao();
 
     bool getAllSimRes(PageDto<SimResDto>& res,uint32_t offset,uint32_t limit);
@@ -27,7 +27,7 @@ public:
     int getSimStatus(int simId,SimStatusDto& status);
     int setSimStatus(int simId,string status);
     int setSimStepAndTime(int simId,int step,int currentTime);
-    int createSim(int simId,string name,string routeAlg,string scheduleAlg);
+    int createSim(int simId,int groupId,string name,string routeAlg,string scheduleAlg);
 private:
     sql::mysql::MySQL_Driver* driver;
     std::unique_ptr<sql::Connection> con;

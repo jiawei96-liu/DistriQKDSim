@@ -8,18 +8,27 @@
 #include "Web/dto/DTOs.hpp"
 #include "Web/dto/ListDTO.hpp"
 #include "Web/dao/SimDao.hpp"
+#include "Config/ConfigReader.h"
 class NetService {
 private:
     static std::unique_ptr<NetService> instance;
     static std::once_flag initFlag;
 
-    CNetwork network;
-    QKDSim sim;
+    vector<CNetwork*> networks;
+    vector<QKDSim*> sims;
     SimDao simDao;
+    int groupId;
 
     // 私有构造函数，确保不能外部创建实例
-    NetService():network(),sim(&network),simDao("tcp://127.0.0.1:3306","debian-sys-maint","jEVKZ9vhBRhQ2KHY","QKDSIM_DB") {
+    NetService():simDao() {
         // std::cout << "Singleton Constructor\n";
+        for(int i=0;i<4;i++){
+            networks.push_back(new CNetwork());
+        }
+        for(int i=0;i<4;i++){
+            sims.push_back(new QKDSim(networks[i]));
+        }
+        groupId=rand();
     }
 
 public:
@@ -36,9 +45,9 @@ public:
     }
 
     // CNetwork 的接口方法
-    CNetwork& getNetwork() {
-        return network;
-    }
+    // CNetwork& getNetwork() {
+    //     return network;
+    // }
 
     oatpp::Object<ListDto<oatpp::Object<DemandDto>>> getAllDemands();
 
@@ -53,21 +62,23 @@ public:
     bool selectDemands(std::string fileName);
     bool selectLinks(std::string fileName);
 
-    oatpp::Object<ListDto<oatpp::Object<SimResDto>>> getSimRes();
+    oatpp::Object<ListDto<oatpp::Object<SimResDto>>> getSimRes(int route,int sched);
 
-    oatpp::Object<ListDto<oatpp::Object<SimResDto>>> getSimResByStep(int step);
+    oatpp::Object<ListDto<oatpp::Object<SimResDto>>> getSimResByStep(int route,int sched,int step);
 
-    oatpp::Object<SimStatusDto> getSimStatus();
-    oatpp::Object<SimResStatusDto> getSimResStatusByStep(int step);
+    oatpp::Object<SimStatusDto> getSimStatus(int route,int sched);
+    oatpp::Object<SimResStatusDto> getSimResStatusByStep(int route,int sched,int step);
 
-    void begin(bool on);
+    void begin(bool on,int routeAlg,int scheduleAlg);
 
-    void nextStep();
-    void next10Step();
+    void nextStep();//unused
+    void next10Step();//unused
 
     void Clear();
 
     bool start(int routeAlg,int scheduleAlg);
+
+    bool allStart();
 };
 
 #endif

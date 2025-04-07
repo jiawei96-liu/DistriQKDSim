@@ -1,12 +1,13 @@
 #include"Web/dao/SimDao.hpp"
+#include "Config/ConfigReader.h"
 using namespace std;
 
 
-SimDao::SimDao(const std::string& host, const std::string& user, const std::string& password, const std::string& database) {
+SimDao::SimDao() {
     try {
         driver = sql::mysql::get_mysql_driver_instance();
-        con.reset(driver->connect(host, user, password));
-        con->setSchema(database); // 选择数据库
+        con.reset(driver->connect(ConfigReader::getStr("db_host"),ConfigReader::getStr("user"), ConfigReader::getStr("password")));
+        con->setSchema(ConfigReader::getStr("scheme")); // 选择数据库
     } catch (sql::SQLException& e) {
         std::cerr << "Database connection failed: " << e.what() << std::endl;
     }
@@ -295,7 +296,7 @@ int SimDao::setSimStepAndTime(int simId, int step, int currentTime) {
 
         if (rowsAffected > 0) {
             cout << "Successfully updated step and time for SimID " << simId << " to Step " << step << " and Time " << currentTime << endl;
-            return 0;  // 更新成功
+            return 1;  // 更新成功
         } else {
             cout << "No simulation found with SimID " << simId << endl;
             return -1;  // 未找到对应SimID的记录
@@ -306,18 +307,19 @@ int SimDao::setSimStepAndTime(int simId, int step, int currentTime) {
     }
 }
 
-int SimDao::createSim(int simId, string name, string routeAlg, string scheduleAlg) {
+int SimDao::createSim(int simId,int groupId, string name, string routeAlg, string scheduleAlg) {
     try {
 
         // 插入新的仿真记录
         sql::PreparedStatement* pstmt = con->prepareStatement(
-            "INSERT INTO Simulations (SimID, Name, Status, RouteAlg, ScheduleAlg, CurrentStep, CurrentTime) "
-            "VALUES (?, ?, 'Init', ?, ?, 0, 0)"
+            "INSERT INTO Simulations (SimID,GroupID, Name, Status, RouteAlg, ScheduleAlg, CurrentStep, CurrentTime) "
+            "VALUES (?,?, ?, 'Init', ?, ?, 0, 0)"
         );
         pstmt->setInt(1,simId);
-        pstmt->setString(2, name);
-        pstmt->setString(3, routeAlg);
-        pstmt->setString(4, scheduleAlg);
+        pstmt->setInt(2,groupId);
+        pstmt->setString(3, name);
+        pstmt->setString(4, routeAlg);
+        pstmt->setString(5, scheduleAlg);
 
         // 执行插入操作
         pstmt->executeUpdate();

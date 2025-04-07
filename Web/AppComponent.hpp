@@ -9,6 +9,7 @@
 
 #include "oatpp/core/macro/component.hpp"
 
+#include "Config/ConfigReader.h"
 /**
  *  Class which creates and holds Application components and registers components in oatpp::base::Environment
  *  Order of components initialization is from top to bottom
@@ -20,7 +21,7 @@ public:
    *  Create ConnectionProvider component which listens on the port
    */
   OATPP_CREATE_COMPONENT(std::shared_ptr<oatpp::network::ServerConnectionProvider>, serverConnectionProvider)([] {
-    return oatpp::network::tcp::server::ConnectionProvider::createShared({"0.0.0.0", 8080, oatpp::network::Address::IP_4});
+    return oatpp::network::tcp::server::ConnectionProvider::createShared({ConfigReader::getStr("host"), ConfigReader::getInt("port"), oatpp::network::Address::IP_4});
   }());
   
   /**

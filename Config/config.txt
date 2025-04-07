@@ -1,0 +1,6 @@
+host=0.0.0.0
+port=8080
+db_host=tcp://127.0.0.1:3306
+user=your_db_user
+password=your_password
+scheme=QKDSIM_DB

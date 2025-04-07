@@ -13,6 +13,7 @@ find_package(Threads REQUIRED)
 target_link_libraries(webapp
     PRIVATE
     alg
+    config
     /usr/local/lib/oatpp-1.3.0/liboatpp.a
     Threads::Threads
     /usr/lib/x86_64-linux-gnu/libmysqlcppconn.so

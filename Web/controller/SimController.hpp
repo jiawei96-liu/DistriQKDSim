@@ -35,7 +35,8 @@ public:
         //启动
         OATPP_LOGI("Sim","Start with route alg %d, schedule alg %d",routeAlg.getValue(0),scheduleAlg.getValue(0));
 
-        bool success=netService->start(routeAlg.getValue(0),scheduleAlg.getValue(0));
+        // bool success=netService->start(routeAlg.getValue(0),scheduleAlg.getValue(0));
+        bool success=netService->allStart();
         if(success){
             return createResponse(Status::CODE_200,"OK");
         }else{
@@ -52,9 +53,9 @@ public:
         return createResponse(Status::CODE_200,"OK");
     }
 
-    ENDPOINT("GET","/api/v1/sim/ResByStep",getSimResByStep,QUERY(UInt32, step, "step")){
+    ENDPOINT("GET","/api/v1/sim/ResByStep",getSimResByStep,QUERY(UInt32, step, "step"),QUERY(Int32, routeAlg, "routingAlgorithm"),QUERY(Int32, scheduleAlg, "schedulingAlgorithm")){
         OATPP_LOGI("Sim","getSimResByStep");
-        auto res=netService->getSimResStatusByStep(step.getValue(0));
+        auto res=netService->getSimResStatusByStep(routeAlg.getValue(0),scheduleAlg.getValue(0),step.getValue(0));
         return createDtoResponse(Status::CODE_200,res);
     }
 
@@ -63,7 +64,7 @@ public:
         OATPP_LOGI("Sim","nextStep");
 
         netService->nextStep();
-        auto res=netService->getSimStatus();
+        auto res=netService->getSimStatus(0,0);
         
         return createDtoResponse(Status::CODE_200,res);
     }
@@ -73,7 +74,7 @@ public:
         OATPP_LOGI("Sim","nextStep");
 
         netService->next10Step();
-        auto res=netService->getSimStatus();
+        auto res=netService->getSimStatus(0,0);
         
         return createDtoResponse(Status::CODE_200,res);
     }
@@ -82,7 +83,7 @@ public:
         //下一步
         OATPP_LOGI("Sim","getSimRes");
 
-        auto res=netService->getSimRes();
+        auto res=netService->getSimRes(0,0);
         
         return createDtoResponse(Status::CODE_200,res);
     }
@@ -96,22 +97,22 @@ public:
     //     return createDtoResponse(Status::CODE_200,res);
     // }
 
-    ENDPOINT("GET", "/api/v1/sim/status", getSimStatus) {
+    ENDPOINT("GET", "/api/v1/sim/status", getSimStatus,QUERY(Int32, routeAlg, "routingAlgorithm"),QUERY(Int32, scheduleAlg, "schedulingAlgorithm")) {
         //下一步
         OATPP_LOGI("Sim","getSimStatus");
 
-        auto res=netService->getSimStatus();
+        auto res=netService->getSimStatus(routeAlg.getValue(0),scheduleAlg.getValue(0));
         cout<<"complete get status"<<endl;
         
         return createDtoResponse(Status::CODE_200,res);
     }
 
-    ENDPOINT("POST","/api/v1/sim/begin",setSimStatus,QUERY(UInt32, on, "on")){
+    ENDPOINT("POST","/api/v1/sim/begin",setSimStatus,QUERY(UInt32, on, "on"),QUERY(Int32, routeAlg, "routingAlgorithm"),QUERY(Int32, scheduleAlg, "schedulingAlgorithm")){
         OATPP_LOGI("Sim","setSimStatus");
         if(on==0){
-            netService->begin(false);
+            netService->begin(false,routeAlg.getValue(0),scheduleAlg.getValue(0));
         }else if(on==1){
-            netService->begin(true);
+            netService->begin(true,routeAlg.getValue(0),scheduleAlg.getValue(0));
         }else{
             return createResponse(Status::CODE_400,"invalid param");
         }

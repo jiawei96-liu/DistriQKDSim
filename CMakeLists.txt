@@ -13,3 +13,5 @@ add_subdirectory(Alg)
 
 
 add_subdirectory(Web)
+
+add_subdirectory(Config)

@@ -8,6 +8,7 @@ std::once_flag NetService::initFlag;
 oatpp::Object<ListDto<oatpp::Object<DemandDto>>> NetService::getAllDemands(){
     auto res = ListDto<oatpp::Object<DemandDto>>::createShared();
     res->items={};
+    auto& network=*networks[0];
     res->count=network.m_vAllDemands.size();
     for (auto& dem:network.m_vAllDemands){
         auto obj=DemandDto::createShared();
@@ -37,6 +38,7 @@ oatpp::Object<PageDto<oatpp::Object<DemandDto>>> NetService::getPageDemands(uint
     res->limit=limit;
     res->items={};
     res->count=(unsigned int)0;
+    auto &network=*networks[0];
     for (uint32_t i=offset;i<min(network.m_vAllLinks.size(),((size_t)offset+(size_t)limit));i++){
         auto& dem=network.m_vAllDemands[i];
         auto obj=DemandDto::createShared();
@@ -67,6 +69,7 @@ oatpp::Object<PageDto<oatpp::Object<LinkDto>>> NetService::getPageLinks(uint32_t
     res->limit=limit;
     res->items={};
     res->count=(unsigned int)0;
+    auto &network=*networks[0];
     for(uint32_t i=offset;i<min(network.m_vAllLinks.size(),((size_t)offset+(size_t)limit));i++){
         auto &link=network.m_vAllLinks[i];
         auto obj=LinkDto::createShared();
@@ -135,24 +138,28 @@ oatpp::Object<ListDto<oatpp::String>> NetService::getLinkFileNames(){
 }
 
 bool NetService::selectDemands(std::string fileName){
-    sim.loadCSV("../data/demands/"+fileName,Demand);
-    sim.readCSV(Demand);
+    for(auto sim:sims){
+        sim->loadCSV("../data/demands/"+fileName,Demand);
+        sim->readCSV(Demand);
+    }
     return true;
 }
 
 bool NetService::selectLinks(std::string fileName){
-    OATPP_LOGD("select","load csv begin");
-    sim.loadCSV("../data/networks/"+fileName,Network);
-    OATPP_LOGD("select","load csv end");
-    sim.readCSV(Network);
+    for(auto sim:sims){
+        sim->loadCSV("../data/networks/"+fileName,Network);
+        sim->readCSV(Network);
+    }
+    
     OATPP_LOGD("select","read csv end");
     return true;
 }
 
-oatpp::Object<ListDto<oatpp::Object<SimResDto>>> NetService::getSimRes(){
+oatpp::Object<ListDto<oatpp::Object<SimResDto>>> NetService::getSimRes(int route,int sched){
     auto res = ListDto<oatpp::Object<SimResDto>>::createShared();
     res->items={};
     res->count=(unsigned int)0;
+    auto &network=*networks[route*2+sched];
     for (NODEID nodeId = 0; nodeId < network.GetNodeNum(); nodeId++)
     {
         for (auto demandIter = network.m_vAllNodes[nodeId].m_mRelayVolume.begin(); demandIter != network.m_vAllNodes[nodeId].m_mRelayVolume.end();)
@@ -226,9 +233,10 @@ oatpp::Object<ListDto<oatpp::Object<SimResDto>>> NetService::getSimRes(){
     return res;
 }
 
-oatpp::Object<ListDto<oatpp::Object<SimResDto>>> NetService::getSimResByStep(int step){
+oatpp::Object<ListDto<oatpp::Object<SimResDto>>> NetService::getSimResByStep(int route,int sched,int step){
     vector<SimResDto> res;
     TIME currentTime;
+    auto &network=*networks[route*2+sched];
     simDao.getSimRes(network.simID,step,res,currentTime);
 
     auto ret = ListDto<oatpp::Object<SimResDto>>::createShared();
@@ -242,9 +250,9 @@ oatpp::Object<ListDto<oatpp::Object<SimResDto>>> NetService::getSimResByStep(int
     return ret;
 }
 
-oatpp::Object<SimStatusDto> NetService::getSimStatus(){
+oatpp::Object<SimStatusDto> NetService::getSimStatus(int route,int sched){
     auto ret=SimStatusDto::createShared();
-
+    auto &network=*networks[route*2+sched];
     int success=simDao.getSimStatus(network.simID,*ret.getPtr());
 
 
@@ -252,9 +260,10 @@ oatpp::Object<SimStatusDto> NetService::getSimStatus(){
     return ret;
 }
 
-oatpp::Object<SimResStatusDto> NetService::getSimResStatusByStep(int step){
+oatpp::Object<SimResStatusDto> NetService::getSimResStatusByStep(int route,int sched,int step){
     vector<SimResDto> res;
     TIME currentTime;
+    auto &network=*networks[route*2+sched];
     simDao.getSimRes(network.simID,step,res,currentTime);
 
     auto ret = SimResStatusDto::createShared();
@@ -270,11 +279,11 @@ oatpp::Object<SimResStatusDto> NetService::getSimResStatusByStep(int step){
 }
 
 void NetService::nextStep(){
-    if (!network.AllDemandsDelivered())
-    {
-        TIME executeTime = network.OneTimeRelay();
-        network.MoveSimTime(executeTime);
-    }
+    // if (!network.AllDemandsDelivered())
+    // {
+    //     TIME executeTime = network.OneTimeRelay();
+    //     network.MoveSimTime(executeTime);
+    // }
 }
 
 void NetService::next10Step(){
@@ -284,6 +293,8 @@ void NetService::next10Step(){
 }
 
 bool NetService::start(int routeAlg,int scheduleAlg){
+
+    auto &network=*networks[routeAlg*2+scheduleAlg];
     if(routeAlg==0){
         network.setShortestPath();
     }else if (routeAlg==1)
@@ -302,7 +313,7 @@ bool NetService::start(int routeAlg,int scheduleAlg){
     }
     
     network.InitRelayPath(std::thread::hardware_concurrency());
-    int success=simDao.createSim(network.simID,"sim-"+to_string(network.simID),to_string(routeAlg),to_string(scheduleAlg));
+    int success=simDao.createSim(network.simID,groupId,"sim-"+to_string(network.simID),to_string(routeAlg),to_string(scheduleAlg));
     if (success!=1)
     {
         cout<<"Failed to create sim in db"<<endl;
@@ -315,8 +326,25 @@ bool NetService::start(int routeAlg,int scheduleAlg){
     return true;
 }
 
-void NetService::begin(bool on){
+bool NetService::allStart(){
+    for(int routeAlg=0;routeAlg<2;routeAlg++){
+        for(int scheduleAlg=0;scheduleAlg<2;scheduleAlg++){
+            start(routeAlg,scheduleAlg);
+        }
+    }
+    for(int routeAlg=0;routeAlg<2;routeAlg++){
+        for(int scheduleAlg=0;scheduleAlg<2;scheduleAlg++){
+            begin(true,routeAlg,scheduleAlg);
+        }
+    }
+
+    return true;
+   
+}
+
+void NetService::begin(bool on,int routeAlg,int scheduleAlg){
     SimStatusDto status;
+    auto& network=*networks[routeAlg*2+scheduleAlg];
     simDao.getSimStatus(network.simID,status);
     if(status.status=="Complete"){
         return;
@@ -343,5 +371,7 @@ void NetService::begin(bool on){
 }
 
 void NetService::Clear(){
-    network.Clear();
+    for(int i=0;i<4;i++){
+        networks[i]->Clear();
+    }
 }

@@ -9,7 +9,7 @@
 #include <random>
 
 
-CNetwork::CNetwork(void):simDao("tcp://127.0.0.1:3306","debian-sys-maint","jEVKZ9vhBRhQ2KHY","QKDSIM_DB")
+CNetwork::CNetwork(void):simDao()
 {
     m_dSimTime = 0;
     FaultTime = -1;

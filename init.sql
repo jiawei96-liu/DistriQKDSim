@@ -7,6 +7,7 @@ USE QKDSIM_DB;
 /* Stauts: 0-初始化 1-运行中 2-暂停 3-完成 */
 CREATE TABLE Simulations (
     SimID              INT PRIMARY KEY,
+    GroupID            INT NOT NULL,
     Name               VARCHAR(255) NOT NULL,
     Status             VARCHAR(31) NOT NULL,
     RouteAlg            VARCHAR(63) NOT NULL,
@@ -35,12 +36,6 @@ CREATE TABLE SimulationResults (
     IsRouteFailed VARCHAR(16) -- 可选值：YES/NO
 );
 
-SELECT * FROM Simulations;
-
-SELECT * FROM SimulationSteps;
-SELECT * FROM SimulationResults;
-
-DELETE FROM Simulations WHERE SimID=1804289383
 
 /* CREATE TABLE SimResult(
     SimID INT UNSIGNED NOT NULL,
