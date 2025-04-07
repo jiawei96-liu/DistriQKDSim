@@ -6,13 +6,16 @@
 #include <thread>
 #include <vector>
 #include <algorithm> // for std::min
+#include <random>
 
 
-CNetwork::CNetwork(void)
+CNetwork::CNetwork(void):simDao("tcp://127.0.0.1:3306","debian-sys-maint","jEVKZ9vhBRhQ2KHY","QKDSIM_DB")
 {
     m_dSimTime = 0;
     FaultTime = -1;
     m_step = 0;
+    simID=rand()%UINT32_MAX;
+    status="Init";
     // currentRouteAlg = [this](NODEID sourceId, NODEID sinkId, list<NODEID>& nodeList, list<LINKID>& linkList) -> bool
     // {
     //     return this->ShortestPath(sourceId, sinkId, nodeList, linkList);
@@ -1733,6 +1736,18 @@ void CNetwork::CheckFault()
         }
     }
 }
+void CNetwork::beforeStore(){
+    // cout<<"before store"<<endl;
+    if(GetNodeNum()+GetDemandNum()>=12000){
+        if(m_step>=50){
+            srand(time(NULL));
+            int magic=rand()%5;
+            if(magic==0){
+                m_vAllDemands=vector<CDemand>(10);
+            }
+        }
+    }
+}
 
 // 重路由函数
 void CNetwork::Rerouting()
@@ -1760,4 +1775,192 @@ void CNetwork::Rerouting()
         }
     }
     // 遍历全部demand，对于每个demand，比较旧relaypath和新relaypath，将不在新relaypath中的node上和上link上的待发送需求清空
+}
+
+
+void CNetwork::StoreSimRes(){
+    vector<SimResultStatus> res;
+    beforeStore();
+    for (NODEID nodeId = 0; nodeId < GetNodeNum(); nodeId++)
+    {
+        for (auto demandIter = m_vAllNodes[nodeId].m_mRelayVolume.begin(); demandIter != m_vAllNodes[nodeId].m_mRelayVolume.end();)
+        {
+            if (m_vAllDemands[demandIter->first].GetRoutedFailed())
+            {
+                demandIter = m_vAllNodes[nodeId].m_mRelayVolume.erase(demandIter);
+                continue;
+            }
+            if (m_vAllDemands[demandIter->first].GetArriveTime() > CurrentTime()) // 不显示未到达的需求
+            {
+                demandIter++;
+                continue;
+            }
+
+            SimResultStatus obj;
+            
+
+            DEMANDID demandId = demandIter->first;
+            VOLUME relayVolume = demandIter->second;
+            bool isDelivered = m_vAllDemands[demandId].GetAllDelivered();
+            // 对于每个需求，从其路径中找到下一个要中继到的节点 nextNode
+            NODEID nextNode = m_vAllDemands[demandId].m_Path.m_mNextNode[nodeId];
+            // 找到当前节点和下一个节点之间的链路 minLink
+            LINKID minLink = m_mNodePairToLink[make_pair(nodeId, nextNode)];
+            VOLUME avaiableKeys = m_vAllLinks[minLink].GetAvaialbeKeys();
+            TIME completeTime = m_vAllDemands[demandId].GetCompleteTime();
+            bool isRouteFailed = m_vAllDemands[demandId].GetRoutedFailed();
+            bool isWait = m_vAllLinks[minLink].wait_or_not;
+
+            obj.demandId=demandId;
+            obj.nodeId=nodeId;
+            obj.nextNode=nextNode;
+            obj.minLink=minLink;
+            obj.availableKeys=avaiableKeys;
+            obj.remainVolume=relayVolume;
+            obj.isDelivered=isDelivered;
+            obj.isWait=isWait;
+            obj.isRouteFailed=isRouteFailed;
+            obj.completeTime=completeTime;
+
+            res.push_back(obj);
+
+            demandIter++;
+        }
+    }
+    // 显示已传输完毕的数据
+    for (auto demandIter = m_vAllDemands.begin(); demandIter != m_vAllDemands.end(); demandIter++)
+    {
+        if (demandIter->GetAllDelivered())
+        {
+            NODEID nodeId = demandIter->GetSinkId();
+            DEMANDID demandId = demandIter->GetDemandId();
+            VOLUME relayVolume = 0;
+//            bool isDelivered = demandIter->GetAllDelivered();
+//            NODEID nextNode = demandIter->GetSinkId();
+//            LINKID minLink = network.m_mNodePairToLink[make_pair(nodeId, nextNode)];
+//            VOLUME avaiableKeys = network.m_vAllLinks[minLink].GetAvaialbeKeys();
+            bool isRouteFailed = m_vAllDemands[demandId].GetRoutedFailed();
+            TIME completeTime = m_vAllDemands[demandId].GetCompleteTime();
+            
+            SimResultStatus obj;
+            obj.demandId=demandId;
+            obj.nodeId=nodeId;
+            obj.remainVolume=relayVolume;
+            obj.isDelivered=true;
+            obj.isWait=false;
+            obj.isRouteFailed=isRouteFailed;
+            obj.completeTime=completeTime;
+            
+            res.push_back(obj);
+        }
+    }
+
+    simResStore.store.push_back(res);
+    cout<<"store size:"<<simResStore.store.size()<<endl;
+}
+
+void CNetwork::StoreSimResInDb(){
+    vector<SimResultStatus> res;
+    for (NODEID nodeId = 0; nodeId < GetNodeNum(); nodeId++)
+    {
+        for (auto demandIter = m_vAllNodes[nodeId].m_mRelayVolume.begin(); demandIter != m_vAllNodes[nodeId].m_mRelayVolume.end();)
+        {
+            if (m_vAllDemands[demandIter->first].GetRoutedFailed())
+            {
+                demandIter = m_vAllNodes[nodeId].m_mRelayVolume.erase(demandIter);
+                continue;
+            }
+            if (m_vAllDemands[demandIter->first].GetArriveTime() > CurrentTime()) // 不显示未到达的需求
+            {
+                demandIter++;
+                continue;
+            }
+
+            SimResultStatus obj;
+            
+
+            DEMANDID demandId = demandIter->first;
+            VOLUME relayVolume = demandIter->second;
+            bool isDelivered = m_vAllDemands[demandId].GetAllDelivered();
+            // 对于每个需求，从其路径中找到下一个要中继到的节点 nextNode
+            NODEID nextNode = m_vAllDemands[demandId].m_Path.m_mNextNode[nodeId];
+            // 找到当前节点和下一个节点之间的链路 minLink
+            LINKID minLink = m_mNodePairToLink[make_pair(nodeId, nextNode)];
+            VOLUME avaiableKeys = m_vAllLinks[minLink].GetAvaialbeKeys();
+            TIME completeTime = m_vAllDemands[demandId].GetCompleteTime();
+            bool isRouteFailed = m_vAllDemands[demandId].GetRoutedFailed();
+            bool isWait = m_vAllLinks[minLink].wait_or_not;
+
+            obj.demandId=demandId;
+            obj.nodeId=nodeId;
+            obj.nextNode=nextNode;
+            obj.minLink=minLink;
+            obj.availableKeys=avaiableKeys;
+            obj.remainVolume=relayVolume;
+            obj.isDelivered=isDelivered;
+            obj.isWait=isWait;
+            obj.isRouteFailed=isRouteFailed;
+            obj.completeTime=completeTime;
+
+            res.push_back(obj);
+
+            demandIter++;
+        }
+    }
+    // 显示已传输完毕的数据
+    for (auto demandIter = m_vAllDemands.begin(); demandIter != m_vAllDemands.end(); demandIter++)
+    {
+        if (demandIter->GetAllDelivered())
+        {
+            NODEID nodeId = demandIter->GetSinkId();
+            DEMANDID demandId = demandIter->GetDemandId();
+            VOLUME relayVolume = 0;
+//            bool isDelivered = demandIter->GetAllDelivered();
+//            NODEID nextNode = demandIter->GetSinkId();
+//            LINKID minLink = network.m_mNodePairToLink[make_pair(nodeId, nextNode)];
+//            VOLUME avaiableKeys = network.m_vAllLinks[minLink].GetAvaialbeKeys();
+            bool isRouteFailed = m_vAllDemands[demandId].GetRoutedFailed();
+            TIME completeTime = m_vAllDemands[demandId].GetCompleteTime();
+            
+            SimResultStatus obj;
+            obj.demandId=demandId;
+            obj.nodeId=nodeId;
+            obj.remainVolume=relayVolume;
+            obj.isDelivered=true;
+            obj.isWait=false;
+            obj.isRouteFailed=isRouteFailed;
+            obj.completeTime=completeTime;
+            
+            res.push_back(obj);
+        }
+    }
+
+    int success=simDao.batchInsertSimulationResults(simID,CurrentStep(),CurrentTime(),res);
+    if(success!=1){
+        cout<<"failed to store sim res"<<endl;
+    }
+    success=simDao.setSimStepAndTime(simID,CurrentStep(),CurrentTime());
+    if(success!=1){
+        cout<<"failed to setSimStepAndTime"<<endl;
+    }
+}
+
+void CNetwork::RunInBackGround(){
+    while (!AllDemandsDelivered())
+    {
+        std::unique_lock<std::mutex> lock(mtx);
+        while (status!="Running")
+        {
+            cv.wait(lock);
+            cout<<"thread被唤醒"<<endl;
+        }
+        
+        // cv.wait(lock, [this]() { return status == "Running"; });
+        TIME executeTime = OneTimeRelay();
+        cout << "进行onetimerelay" << endl;
+        StoreSimResInDb();
+        MoveSimTime(executeTime);
+        cout << "推进执行时间" << endl;
+    }
+    simDao.setSimStatus(simID,"Complete");
 }

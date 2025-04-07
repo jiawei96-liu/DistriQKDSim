@@ -1,4 +1,5 @@
 # 生成库文件
+set(OATPP_INCLUDE_DIR /usr/local/include/oatpp-1.3.0/oatpp)
 add_library(alg STATIC
     QKDSim.cpp
     Demand.cpp
@@ -18,4 +19,4 @@ add_library(alg STATIC
 )
 
 # 设置包含目录
-target_include_directories(alg PUBLIC ${CMAKE_SOURCE_DIR})
+target_include_directories(alg PUBLIC ${CMAKE_SOURCE_DIR} ${OATPP_INCLUDE_DIR})

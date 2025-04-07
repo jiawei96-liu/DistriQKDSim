@@ -226,14 +226,47 @@ oatpp::Object<ListDto<oatpp::Object<SimResDto>>> NetService::getSimRes(){
     return res;
 }
 
+oatpp::Object<ListDto<oatpp::Object<SimResDto>>> NetService::getSimResByStep(int step){
+    vector<SimResDto> res;
+    TIME currentTime;
+    simDao.getSimRes(network.simID,step,res,currentTime);
+
+    auto ret = ListDto<oatpp::Object<SimResDto>>::createShared();
+    ret->items={};
+    for(auto& simRes:res){
+        auto _simRes=SimResDto::createShared();
+        *_simRes.getPtr()=simRes;
+        ret->items->push_back(_simRes);
+    }
+    ret->count=ret->items->size();
+    return ret;
+}
+
 oatpp::Object<SimStatusDto> NetService::getSimStatus(){
-    auto simRes=getSimRes();
-    auto res=SimStatusDto::createShared();
-    res->items=simRes->items;
-    res->count=simRes->count;
-    res->currentTime=network.CurrentTime();
-    res->currentStep=network.CurrentStep();
-    return res;
+    auto ret=SimStatusDto::createShared();
+
+    int success=simDao.getSimStatus(network.simID,*ret.getPtr());
+
+
+
+    return ret;
+}
+
+oatpp::Object<SimResStatusDto> NetService::getSimResStatusByStep(int step){
+    vector<SimResDto> res;
+    TIME currentTime;
+    simDao.getSimRes(network.simID,step,res,currentTime);
+
+    auto ret = SimResStatusDto::createShared();
+    ret->items={};
+    for(auto& simRes:res){
+        auto _simRes=SimResDto::createShared(simRes);
+        ret->items->push_back(_simRes);
+    }
+    ret->count=ret->items->size();
+    ret->currentTime=currentTime;
+    ret->currentStep=step;
+    return ret;
 }
 
 void NetService::nextStep(){
@@ -241,7 +274,6 @@ void NetService::nextStep(){
     {
         TIME executeTime = network.OneTimeRelay();
         network.MoveSimTime(executeTime);
-
     }
 }
 
@@ -270,7 +302,44 @@ bool NetService::start(int routeAlg,int scheduleAlg){
     }
     
     network.InitRelayPath(std::thread::hardware_concurrency());
+    int success=simDao.createSim(network.simID,"sim-"+to_string(network.simID),to_string(routeAlg),to_string(scheduleAlg));
+    if (success!=1)
+    {
+        cout<<"Failed to create sim in db"<<endl;
+        return false;
+    }
+
+    std::thread backgroundThread(&CNetwork::RunInBackGround, &network);
+    backgroundThread.detach();
+    
     return true;
+}
+
+void NetService::begin(bool on){
+    SimStatusDto status;
+    simDao.getSimStatus(network.simID,status);
+    if(status.status=="Complete"){
+        return;
+    }
+
+    {
+        if(on){
+            int success=simDao.setSimStatus(network.simID,"Running");
+            if(success==1){
+                std::lock_guard<std::mutex> lock(network.mtx);
+                network.status="Running";
+                std::cout<<"network.status=Running"<<std::endl;
+                network.cv.notify_all();
+            
+            }
+        }else{
+            int success=simDao.setSimStatus(network.simID,"Pause");
+            if(success==1){
+                std::unique_lock<std::mutex> lock(network.mtx);
+                network.status="Pause";
+            }
+        }
+    }
 }
 
 void NetService::Clear(){

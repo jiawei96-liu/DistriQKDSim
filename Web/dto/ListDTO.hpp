@@ -23,8 +23,8 @@ class DemandsListDto : public ListDto<oatpp::Object<DemandDto>> {
 
 };
 
-class SimStatusDto: public ListDto<oatpp::Object<SimResDto>> {
-    DTO_INIT(SimStatusDto,ListDto<oatpp::Object<SimResDto>>)
+class SimResStatusDto: public ListDto<oatpp::Object<SimResDto>> {
+    DTO_INIT(SimResStatusDto,ListDto<oatpp::Object<SimResDto>>)
 
     DTO_FIELD(UInt32,currentStep);
     DTO_FIELD(Float64,currentTime);

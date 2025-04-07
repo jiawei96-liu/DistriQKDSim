@@ -52,6 +52,12 @@ public:
         return createResponse(Status::CODE_200,"OK");
     }
 
+    ENDPOINT("GET","/api/v1/sim/ResByStep",getSimResByStep,QUERY(UInt32, step, "step")){
+        OATPP_LOGI("Sim","getSimResByStep");
+        auto res=netService->getSimResStatusByStep(step.getValue(0));
+        return createDtoResponse(Status::CODE_200,res);
+    }
+
     ENDPOINT("POST", "/api/v1/sim/nextStep", nextStep) {
         //下一步
         OATPP_LOGI("Sim","nextStep");
@@ -81,15 +87,36 @@ public:
         return createDtoResponse(Status::CODE_200,res);
     }
 
+    // ENDPOINT("GET", "/api/v1/sim/status", getSimStatus) {
+    //     //下一步
+    //     OATPP_LOGI("Sim","getSimStatus");
+
+    //     auto res=netService->getSimStatus();
+        
+    //     return createDtoResponse(Status::CODE_200,res);
+    // }
+
     ENDPOINT("GET", "/api/v1/sim/status", getSimStatus) {
         //下一步
         OATPP_LOGI("Sim","getSimStatus");
 
         auto res=netService->getSimStatus();
+        cout<<"complete get status"<<endl;
         
         return createDtoResponse(Status::CODE_200,res);
     }
 
+    ENDPOINT("POST","/api/v1/sim/begin",setSimStatus,QUERY(UInt32, on, "on")){
+        OATPP_LOGI("Sim","setSimStatus");
+        if(on==0){
+            netService->begin(false);
+        }else if(on==1){
+            netService->begin(true);
+        }else{
+            return createResponse(Status::CODE_400,"invalid param");
+        }
+        return createResponse(Status::CODE_200,"OK");
+    }
 
 };
 

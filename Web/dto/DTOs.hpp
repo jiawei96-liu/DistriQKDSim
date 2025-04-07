@@ -53,7 +53,30 @@ class SimResDto: public oatpp::DTO{
     DTO_FIELD(Float64, remainVolume);
     DTO_FIELD(String,status);
     DTO_FIELD(String,isRouteFailed);
+
+    SimResDto()=default;
+    SimResDto(const SimResDto& that){
+        demandId=that.demandId;
+        nodeId=that.nodeId;
+        nextNodeId=that.nextNodeId;
+        nextHopLinkId=that.nextHopLinkId;
+        availableKeys=that.availableKeys;
+        remainVolume=that.remainVolume;
+        status=that.status;
+        isRouteFailed=that.isRouteFailed;
+    }
     
+};
+
+class SimStatusDto: public oatpp::DTO{
+    DTO_INIT(SimStatusDto,DTO)
+
+    DTO_FIELD(String,name);
+    DTO_FIELD(String,status);
+    DTO_FIELD(String,routeAlg);
+    DTO_FIELD(String,scheduleAlg);
+    DTO_FIELD(UInt32,currentStep);
+    DTO_FIELD(Float64,currentTime);
 };
 
 #include OATPP_CODEGEN_END(DTO)

@@ -3,60 +3,51 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>当前结果</title>
+    <title>仿真结果</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <style>
         .container {
-            width: 100%;         /* 设置宽度为100% */
-            margin: 0 auto;      /* 去掉外边距 */
-            padding: 20px;       /* 可以根据需要调整内边距 */
+            width: 100%;
+            margin: 0 auto;
+            padding: 20px;
         }
         .result {
             margin-top: 20px;
             display: flex;
             flex-direction: column;
-            height: 500px; /* 设置固定高度 */
+            height: 500px;
             overflow: hidden;
             position: relative;
         }
         .result-content {
-            overflow-y: scroll; /* 启用垂直滚动 */
+            overflow-y: scroll;
             flex-grow: 1;
             padding-right: 10px;
         }
         .card-body {
             padding: 20px;
         }
-        .modal-content {
-            padding: 20px;
-        }
-        .modal-body {
-            max-height: 300px;
-            overflow-y: auto;
-        }
         table thead {
             position: sticky;
             top: 0;
-            background-color: #f8f9fa;  /* 设置背景色，避免透明 */
-            z-index: 2;  /* 确保表头在内容的上面 */
-            box-shadow: 0 2px 2px -2px rgba(0, 0, 0, 0.2);  /* 可选：添加阴影效果来增强层次感 */
+            background-color: #f8f9fa;
+            z-index: 2;
+            box-shadow: 0 2px 2px -2px rgba(0, 0, 0, 0.2);
         }
-
         table td {
-            background-color: #fff;  /* 给表格的单元格设置白色背景，避免内容和表头重叠时颜色问题 */
+            background-color: #fff;
+        }
+        #simTime, #simtStep {
+            width: 80px;
+            text-align: center;
+            font-family: monospace;
         }
         #currentTime {
             width: 80px;  /* 设置固定宽度 */
             text-align: center;  /* 使文本居中 */
             font-family: monospace;  /* 使用等宽字体，保证数字对齐 */
         }
-
-
-        /* table th, table td {
-            text-align: center;
-        } */
-        
     </style>
 </head>
 <body>
@@ -84,86 +75,133 @@
         </div>
     </nav>
 
-    <!-- 首页操作按钮 -->
-    <div class="card">
+    <!-- 仿真状态展示 -->
+    <div class="card mt-4">
         <div class="card-body d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center">
-                <h5 class="card-title mb-0">当前时刻</h5>
-                <div class="card"><p id="currentTime">0.0s</p></div>
-                <button id="simStart" class="btn btn-primary ms-3">开始</button>
-                <button id="simNextStep" class="btn btn-primary ms-3">后一步</button>
-                <button id="simNext10Step" class="btn btn-primary ms-3">后十步</button>
+            <div>
+                <h5>仿真状态</h5>
+                <h6>名称: <span id="simName">-</span></h6>
+                <h6>状态: <span id="simStatus">-</span></h6>
+                <h6>路由算法: <span id="routeAlg">-</span></h6>
+                <h6>调度算法: <span id="scheduleAlg">-</span></h6>
+                <h6>Step: <span id="simStep">-</span></p>
+                <h6>Time: <span id="simTime">-</span> s</h6>
             </div>
+            <div>
+                <button id="simStart" class="btn btn-primary">启动</button>
+                <button id="simPause" class="btn btn-primary">暂停</button>
+            </div>
+            
         </div>
     </div>
-    
-    
 
     <!-- 显示仿真结果 -->
     <div id="result" class="result">
-        <div id="result-header"></div>
+        <div class="d-flex align-items-center">
+            <div>
+                <h5 class="card-title me-4">当前Step:<span id="currentStep">-</span></h5>
+            </div>
+            <div>
+                <h5 class="card-title me-4">当前Time:<span id="currentTime">-</span>s</h5>
+            </div>
+            <div>
+                <button id="simPrevStep" class="btn btn-secondary me-2">前一步</button>
+                <button id="simNextStep" class="btn btn-primary me-2">后一步</button>
+                <button id="simNext10Step" class="btn btn-primary">后十步</button>
+            </div>
+        </div>
         <div id="result-content" class="result-content"></div>
     </div>
-
-    <!-- 选择拓扑和需求操作 -->
-    <!-- <div class="card mt-4">
-        <div class="card-body">
-            <h5 class="card-title">选择操作</h5>
-            <button id="selectLinkBtn" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#selectLinkModal">选择拓扑文件</button>
-            <button id="selectDemandBtn" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#selectDemandModal">选择需求文件</button>
-        </div>
-    </div> -->
 </div>
-
 
 <script>
     const apiBaseUrl = "/api/v1";
+    let currentStep = 1;
+    
 
-    let intervalId = null;  // 用于存储定时器ID
     let isRunning = false;  // 用于标记是否正在运行
 
     // 点击开始/暂停按钮
     document.getElementById('simStart').addEventListener('click', async () => {
-        if (isRunning) {
-            // 停止定时器
-            clearInterval(intervalId);
-            document.getElementById('simStart').innerText = "开始";
-        } else {
-            // 启动定时器，每秒执行一次 nextStep
-            intervalId = setInterval(async () => {
-                const response = await fetch(`${apiBaseUrl}/sim/nextStep`, { method: 'POST' });
-                const data = await response.json();
-                displaySimResult(data.items);
-                document.getElementById("currentTime").innerText=data.currentTime.toFixed(4)+'s';
-            }, 1000);
-            document.getElementById('simStart').innerText = "暂停";
+        url=apiBaseUrl+'/sim/begin?on=1'
+        try {
+            // 发起POST请求（使用POST方法，通过查询参数传递）
+            const response = await fetch(url, {
+                method: 'POST'  // 使用GET方法
+            });
+
+            // 检查响应状态码
+            if (response.status === 200) {
+                alert('启动成功');
+            } else {
+                alert('启动失败');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('请求失败');
         }
-
-        // 切换状态
-        isRunning = !isRunning;
+        loadSimStatus();
     });
 
-    // 下一步
-    document.getElementById('simNextStep').addEventListener('click', async () => {
-        const response = await fetch(`${apiBaseUrl}/sim/nextStep`,{ method: 'POST' });
-        const data = await response.json();
-        displaySimResult(data.items);
-        document.getElementById("currentTime").innerText=data.currentTime.toFixed(4)+'s';
+    document.getElementById('simPause').addEventListener('click', async () => {
+        url=apiBaseUrl+'/sim/begin?on=0'
+        try {
+            // 发起POST请求（使用POST方法，通过查询参数传递）
+            const response = await fetch(url, {
+                method: 'POST'  // 使用GET方法
+            });
+
+            // 检查响应状态码
+            if (response.status === 200) {
+                alert('启动成功');
+            } else {
+                alert('启动失败');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('请求失败');
+        }
+        loadSimStatus();
     });
 
-    // 10步
-    document.getElementById('simNext10Step').addEventListener('click', async () => {
-        const response = await fetch(`${apiBaseUrl}/sim/next10Step`,{ method: 'POST' });
-        const data = await response.json();
-        displaySimResult(data.items);
-        document.getElementById("currentTime").innerText=data.currentTime.toFixed(4)+'s';
-    });
+    // 加载仿真状态
+    async function loadSimStatus() {
+        try {
+            const res = await axios.get(`${apiBaseUrl}/sim/status`);
+            const data = res.data;
 
-    
-    function displaySimResult(data){
-        // const headerDiv=document.getElementById('result-header');
+            document.getElementById('simName').innerText = data.name;
+            document.getElementById('simStatus').innerText = data.status;
+            document.getElementById('routeAlg').innerText = data.routeAlg;
+            document.getElementById('scheduleAlg').innerText = data.scheduleAlg;
+            document.getElementById('simStep').innerText = data.currentStep;
+            document.getElementById('simTime').innerText = data.currentTime;
+            isRunning=data.status=="Running";
+            // currentStep = data.currentStep;  // 同步当前Step
+            // loadSimResults(currentStep);
+        } catch (error) {
+            console.error("加载仿真状态失败:", error);
+        }
+    }
+
+    // 加载指定Step的仿真结果
+    async function loadSimResults(step) {
+        try {
+            const res = await axios.get(`${apiBaseUrl}/sim/ResByStep?step=${step}`);
+            const data = res.data;
+
+            document.getElementById('currentStep').innerText = data.currentStep;
+            document.getElementById('currentTime').innerText = data.currentTime;
+
+            displaySimResult(data.items);
+        } catch (error) {
+            console.error(`加载 Step ${step} 仿真结果失败:`, error);
+        }
+    }
+
+    // 显示仿真结果
+    function displaySimResult(items) {
         const contentDiv = document.getElementById('result-content');
-        // let header= '<h3>仿真结果</h3>'
         let table = `<table class="table table-bordered">
                          <thead>
                              <tr>
@@ -171,41 +209,50 @@
                                  <th>当前节点序号</th>
                                  <th>下一节点序号</th>
                                  <th>下一跳链路序号</th>
-                                 <th>可用密钥(Kbit)</th>
-                                 <th>待传数据量(Mbit)</th>
+                                 <th>可用密钥 (Kbit)</th>
+                                 <th>待传数据量 (Mbit)</th>
                                  <th>需求状态</th>
                                  <th>是否故障</th>
                              </tr>
                          </thead>
                          <tbody>`;
-        data.forEach(simRes => {
+        items.forEach(item => {
             table += `
                 <tr>
-                    <td>${simRes.demandId}</td>
-                    <td>${simRes.nodeId}</td>
-                    <td>${simRes.nextNodeId}</td>
-                    <td>${simRes.nextHopLinkId}</td>
-                    <td>${simRes.availableKeys}</td>
-                    <td>${simRes.remainVolume}</td>
-                    <td>${simRes.status}</td>
-                    <td>${simRes.isRouteFailed}</td>
+                    <td>${item.demandId}</td>
+                    <td>${item.nodeId}</td>
+                    <td>${item.nextNodeId}</td>
+                    <td>${item.nextHopLinkId}</td>
+                    <td>${item.availableKeys}</td>
+                    <td>${item.remainVolume}</td>
+                    <td>${item.status}</td>
+                    <td>${item.isRouteFailed}</td>
                 </tr>`;
         });
         table += `</tbody></table>`;
-        // headerDiv.innerHTML=header;
         contentDiv.innerHTML = table;
     }
 
-    async function loadSimResult(){
-        const response = await fetch(`${apiBaseUrl}/sim/status`);
-        const data = await response.json();
-        displaySimResult(data.items);
-        document.getElementById("currentTime").innerText=data.currentTime+'s';
-    }
+    // 按钮事件
+    document.getElementById('simNextStep').addEventListener('click', () => {
+        currentStep++;
+        loadSimResults(currentStep);
+    });
 
-    loadSimResult();
-    
+    document.getElementById('simPrevStep').addEventListener('click', () => {
+        if (currentStep > 1) {
+            currentStep--;
+            loadSimResults(currentStep);
+        }
+    });
 
+    document.getElementById('simNext10Step').addEventListener('click', () => {
+        currentStep += 10;
+        loadSimResults(currentStep);
+    });
+
+    // 初始化加载
+    loadSimStatus();
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>

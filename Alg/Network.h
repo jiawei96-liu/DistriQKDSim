@@ -4,9 +4,13 @@
 #include "Link.h"
 #include "Demand.h"
 #include "NetEvent.h"
+#include "Store.hpp"
+#include "Web/dao/SimDao.hpp"
 #include "Alg/Route/RouteFactory.h"
 //#include "KeyManager.h"
 #include <functional>
+#include <condition_variable>
+#include <mutex>
 
 class CNetwork
 {
@@ -32,6 +36,11 @@ public:
     // vector<CLink> failedLink; //存储当前时隙故障的link
     list<LINKID> failedLink; //存储当前时隙故障的linkID
 
+    uint32_t simID;
+    string status;
+    std::mutex mtx;
+    std::condition_variable cv;
+
 
 private:
     UINT m_uiNodeNum;	// 网络中的节点数量
@@ -41,6 +50,9 @@ private:
     UINT m_step;        // 执行步数
     std::unique_ptr<route::RouteFactory> m_routeFactory;    //路由策略工厂
     std::unique_ptr<route::RouteStrategy> m_routeStrategy;  //当前路由策略
+    SimResultStore simResStore;
+    SimDao simDao;
+
 
 public:
     void SetNodeNum(UINT nodeNum);
@@ -62,7 +74,11 @@ public:
 
     void Clear();
 
+    void StoreSimRes();
+    void StoreSimResInDb();
+    void beforeStore();
 
+    void RunInBackGround();
 
 
     //common route algorithms

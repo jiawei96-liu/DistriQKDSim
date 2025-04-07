@@ -7,6 +7,7 @@
 #include "Alg/QKDSim.h"
 #include "Web/dto/DTOs.hpp"
 #include "Web/dto/ListDTO.hpp"
+#include "Web/dao/SimDao.hpp"
 class NetService {
 private:
     static std::unique_ptr<NetService> instance;
@@ -14,9 +15,10 @@ private:
 
     CNetwork network;
     QKDSim sim;
+    SimDao simDao;
 
     // 私有构造函数，确保不能外部创建实例
-    NetService():network(),sim(&network) {
+    NetService():network(),sim(&network),simDao("tcp://127.0.0.1:3306","debian-sys-maint","jEVKZ9vhBRhQ2KHY","QKDSIM_DB") {
         // std::cout << "Singleton Constructor\n";
     }
 
@@ -53,7 +55,13 @@ public:
 
     oatpp::Object<ListDto<oatpp::Object<SimResDto>>> getSimRes();
 
+    oatpp::Object<ListDto<oatpp::Object<SimResDto>>> getSimResByStep(int step);
+
     oatpp::Object<SimStatusDto> getSimStatus();
+    oatpp::Object<SimResStatusDto> getSimResStatusByStep(int step);
+
+    void begin(bool on);
+
     void nextStep();
     void next10Step();
 
