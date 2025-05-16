@@ -35,13 +35,6 @@ CREATE TABLE SimulationResults (
     IsRouteFailed VARCHAR(16) -- 可选值：YES/NO
 );
 
-SELECT * FROM Simulations;
-
-SELECT * FROM SimulationSteps;
-SELECT * FROM SimulationResults;
-
-DELETE FROM Simulations WHERE SimID=1804289383
-
 /* CREATE TABLE SimResult(
     SimID INT UNSIGNED NOT NULL,
     Step INT UNSIGNED NOT NULL,

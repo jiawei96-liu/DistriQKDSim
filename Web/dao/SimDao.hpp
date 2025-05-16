@@ -28,8 +28,13 @@ public:
     int setSimStatus(int simId,string status);
     int setSimStepAndTime(int simId,int step,int currentTime);
     int createSim(int simId,string name,string routeAlg,string scheduleAlg);
+    int clear();
 private:
     sql::mysql::MySQL_Driver* driver;
     std::unique_ptr<sql::Connection> con;
+    std::string host;
+    std::string user;
+    std::string password;
+    std::string database;
 };
 

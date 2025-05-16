@@ -153,9 +153,9 @@
 
             // 检查响应状态码
             if (response.status === 200) {
-                alert('启动成功');
+                alert('暂停成功');
             } else {
-                alert('启动失败');
+                alert('暂停失败');
             }
         } catch (error) {
             console.error('Error:', error);
@@ -237,18 +237,21 @@
     document.getElementById('simNextStep').addEventListener('click', () => {
         currentStep++;
         loadSimResults(currentStep);
+        loadSimStatus();
     });
 
     document.getElementById('simPrevStep').addEventListener('click', () => {
         if (currentStep > 1) {
             currentStep--;
             loadSimResults(currentStep);
+            loadSimStatus();
         }
     });
 
     document.getElementById('simNext10Step').addEventListener('click', () => {
         currentStep += 10;
         loadSimResults(currentStep);
+        loadSimStatus();
     });
 
     // 初始化加载

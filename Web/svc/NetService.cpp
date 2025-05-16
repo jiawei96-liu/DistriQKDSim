@@ -37,7 +37,7 @@ oatpp::Object<PageDto<oatpp::Object<DemandDto>>> NetService::getPageDemands(uint
     res->limit=limit;
     res->items={};
     res->count=(unsigned int)0;
-    for (uint32_t i=offset;i<min(network.m_vAllLinks.size(),((size_t)offset+(size_t)limit));i++){
+    for (uint32_t i=offset;i<min(network.m_vAllDemands.size(),((size_t)offset+(size_t)limit));i++){
         auto& dem=network.m_vAllDemands[i];
         auto obj=DemandDto::createShared();
         obj->demandId=dem.GetDemandId();
@@ -247,7 +247,7 @@ oatpp::Object<SimStatusDto> NetService::getSimStatus(){
 
     int success=simDao.getSimStatus(network.simID,*ret.getPtr());
 
-
+    ret->status=network.status;
 
     return ret;
 }
@@ -284,6 +284,7 @@ void NetService::next10Step(){
 }
 
 bool NetService::start(int routeAlg,int scheduleAlg){
+    simDao.clear();
     if(routeAlg==0){
         network.setShortestPath();
     }else if (routeAlg==1)
@@ -300,8 +301,9 @@ bool NetService::start(int routeAlg,int scheduleAlg){
     }else{
         return false;
     }
-    
-    network.InitRelayPath(std::thread::hardware_concurrency());
+    // network.InitRelayPath(std::thread::hardware_concurrency());
+    network.InitRelayPath();
+    network.InitLinkDemand();
     int success=simDao.createSim(network.simID,"sim-"+to_string(network.simID),to_string(routeAlg),to_string(scheduleAlg));
     if (success!=1)
     {
@@ -321,27 +323,35 @@ void NetService::begin(bool on){
     if(status.status=="Complete"){
         return;
     }
-
     {
         if(on){
-            int success=simDao.setSimStatus(network.simID,"Running");
-            if(success==1){
-                std::lock_guard<std::mutex> lock(network.mtx);
-                network.status="Running";
-                std::cout<<"network.status=Running"<<std::endl;
-                network.cv.notify_all();
-            
-            }
+            std::unique_lock<std::mutex> lock(network.mtx);
+            network.status="Running";
+            network.cv.notify_all();
+            // int success=simDao.setSimStatus(network.simID,"Running");
+            // if(success==1){
+                // std::cout<<"network.status=Running"<<std::endl;
+            // }else{
+            //     network.status=originStatus;
+            // }
         }else{
-            int success=simDao.setSimStatus(network.simID,"Pause");
-            if(success==1){
-                std::unique_lock<std::mutex> lock(network.mtx);
-                network.status="Pause";
-            }
+            std::unique_lock<std::mutex> lock(network.mtx);
+            network.status="Pause";
+            // int success=simDao.setSimStatus(network.simID,"Pause");
+            // if(success=1){
+            //     network.cv.notify_all();
+            // }else{
+            //     network.status=originStatus;
+            // }
         }
     }
 }
 
 void NetService::Clear(){
+    {
+        std::unique_lock<std::mutex> lock(network.mtx);
+        network.status="End";
+    }
+
     network.Clear();
 }

@@ -48,6 +48,23 @@ void CNetwork::Clear()
     m_vAllRelayPaths.clear();
     m_mNodePairToLink.clear();
     m_mDemandArriveTime.clear();
+    simID=rand()%UINT32_MAX;
+    status="Init";
+    // currentRouteAlg = [this](NODEID sourceId, NODEID sinkId, list<NODEID>& nodeList, list<LINKID>& linkList) -> bool
+    // {
+    //     return this->ShortestPath(sourceId, sinkId, nodeList, linkList);
+    // };
+    m_routeFactory=make_unique<route::RouteFactory>(this);
+
+    // m_routeStrategy=std::move(m_routeFactory->CreateStrategy(route::RouteType_Bfs));    //BFS
+
+    m_routeStrategy=std::move(m_routeFactory->CreateStrategy(route::RouteType_KeyRateShortestPath));   //keyrate最短路策略
+
+    currentScheduleAlg = [this](NODEID nodeId, map<DEMANDID, VOLUME>& relayDemands) -> TIME
+    {
+        return this->MinimumRemainingTimeFirst(nodeId, relayDemands);
+        // return this->AverageKeyScheduling(nodeId, relayDemands);
+    };
 }
 
 TIME CNetwork::CurrentTime()
@@ -711,6 +728,7 @@ void CNetwork::InitRelayPath(DEMANDID demandId) {
 
 void CNetwork::InitLinkDemand()
 {
+    
     for (auto &demand : m_vAllDemands)
     {
         if (!demand.m_Path.m_lTraversedLinks.empty())
@@ -719,6 +737,7 @@ void CNetwork::InitLinkDemand()
             m_vAllLinks[linkid].m_lCarriedDemands.insert(demand.GetDemandId());
             // cout << "linkid" << linkid << endl;
             // cout << "demandid" << demand.GetDemandId() << endl;
+            cout<<"InitLinkDemand function eshtaning"<<endl;
         }
     }
 
@@ -754,63 +773,63 @@ void CNetwork::InitLinkDemand()
     // }
 }
 
-// // 为所有需求初始化中继路径
-// void CNetwork::InitRelayPath()
-// {
-//     cout << "Init Relay Path" << endl;
-//     auto start = std::chrono::high_resolution_clock::now();
-//     for (auto demandIter = m_vAllDemands.begin(); demandIter != m_vAllDemands.end(); demandIter++)
-//     {
-//         InitRelayPath(demandIter->GetDemandId());
-//         // cout << "Initing Relay Path for demand " << demandIter->GetDemandId() << endl;
-//     }
-//     auto end = std::chrono::high_resolution_clock::now();
-//     std::chrono::duration<double> elapsed = end - start;
-//     std::cout << "InitRelayPath time: " << elapsed.count() << " seconds" << std::endl;
-// }
-
-// 为所有需求初始化中继路径(并发)
-void CNetwork::InitRelayPath(size_t max_threads = std::thread::hardware_concurrency()) {
-    std::cout << "Init Relay Path" << std::endl;
+// 为所有需求初始化中继路径
+void CNetwork::InitRelayPath()
+{
+    cout << "Init Relay Path" << endl;
     auto start = std::chrono::high_resolution_clock::now();
-
-    // 如果未指定最大线程数，则使用硬件支持的线程数
-    if (max_threads == 0) {
-        max_threads = std::thread::hardware_concurrency();
+    for (auto demandIter = m_vAllDemands.begin(); demandIter != m_vAllDemands.end(); demandIter++)
+    {
+        InitRelayPath(demandIter->GetDemandId());
+        // cout << "Initing Relay Path for demand " << demandIter->GetDemandId() << endl;
     }
-
-    // 创建线程池
-    std::vector<std::thread> threads;
-    threads.reserve(max_threads); // 预分配线程空间
-
-    // 任务分块处理
-    size_t num_demands = m_vAllDemands.size();
-    size_t chunk_size = (num_demands + max_threads - 1) / max_threads; // 每个线程处理的任务数
-
-    // 启动线程处理任务块
-    for (size_t i = 0; i < max_threads; ++i) {
-        size_t start_index = i * chunk_size;
-        size_t end_index = std::min(start_index + chunk_size, num_demands);
-
-        threads.emplace_back([this, start_index, end_index]() {
-            for (size_t j = start_index; j < end_index; ++j) {
-                DEMANDID demandId = m_vAllDemands[j].GetDemandId();
-                InitRelayPath(demandId); // 每个线程处理一个任务块
-
-                std::this_thread::sleep_for(std::chrono::milliseconds(400));
-            }
-        });
-    }
-
-    // 等待所有线程完成
-    for (auto& thread : threads) {
-        thread.join();
-    }
-
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = end - start;
     std::cout << "InitRelayPath time: " << elapsed.count() << " seconds" << std::endl;
 }
+
+// // 为所有需求初始化中继路径(并发)
+// void CNetwork::InitRelayPath(size_t max_threads = std::thread::hardware_concurrency()) {
+//     std::cout << "Init Relay Path" << std::endl;
+//     auto start = std::chrono::high_resolution_clock::now();
+
+//     // 如果未指定最大线程数，则使用硬件支持的线程数
+//     if (max_threads == 0) {
+//         max_threads = std::thread::hardware_concurrency();
+//     }
+
+//     // 创建线程池
+//     std::vector<std::thread> threads;
+//     threads.reserve(max_threads); // 预分配线程空间
+
+//     // 任务分块处理
+//     size_t num_demands = m_vAllDemands.size();
+//     size_t chunk_size = (num_demands + max_threads - 1) / max_threads; // 每个线程处理的任务数
+
+//     // 启动线程处理任务块
+//     for (size_t i = 0; i < max_threads; ++i) {
+//         size_t start_index = i * chunk_size;
+//         size_t end_index = std::min(start_index + chunk_size, num_demands);
+
+//         threads.emplace_back([this, start_index, end_index]() {
+//             for (size_t j = start_index; j < end_index; ++j) {
+//                 DEMANDID demandId = m_vAllDemands[j].GetDemandId();
+//                 InitRelayPath(demandId); // 每个线程处理一个任务块
+
+//                 std::this_thread::sleep_for(std::chrono::milliseconds(400));
+//             }
+//         });
+//     }
+
+//     // 等待所有线程完成
+//     for (auto& thread : threads) {
+//         thread.join();
+//     }
+
+//     auto end = std::chrono::high_resolution_clock::now();
+//     std::chrono::duration<double> elapsed = end - start;
+//     std::cout << "InitRelayPath time: " << elapsed.count() << " seconds" << std::endl;
+// }
 
 // 计算给定节点 nodeId 上最小剩余时间优先的需求转发时间，并记录将要转发的需求和数据量
 // 基于节点
@@ -1535,7 +1554,80 @@ TIME CNetwork::FindDemandToRelay(map<NODEID, map<DEMANDID, VOLUME>> &relayDemand
     return minExecuteTime;
 }
 
-// 执行一次单跳的需求转发操作，更新各节点和链路上的数据量和密钥
+// 执行一次单跳的需求转发操作，更新各节点和链路上的数据量和密钥(存在中继路径无法查询的问题)
+// void CNetwork::RelayForOneHop(TIME executeTime, map<NODEID, map<DEMANDID, VOLUME>> &relayDemands)
+// {
+//     std::cout<<"进入RelayForOneHop阶段，进行调度方案执行"<< std::endl;
+//     map<NODEID, map<DEMANDID, VOLUME>>::iterator nodeIter;
+//     nodeIter = relayDemands.begin();
+//     for (; nodeIter != relayDemands.end(); nodeIter++)
+//     {
+//         for (auto demandIter = nodeIter->second.begin(); demandIter != nodeIter->second.end(); demandIter++)
+//         {
+//             // 对于每个需求，从其路径中找到下一个要中继到的节点 nextNode
+//             NODEID nextNode = m_vAllDemands[demandIter->first].m_Path.m_mNextNode[nodeIter->first];
+
+//             // 找到当前节点和下一个节点之间的链路 minLink，并在该链路上消耗相应的密钥数量（等于转发的数据量）
+//             LINKID minLink = m_mNodePairToLink[make_pair(nodeIter->first, nextNode)];
+//             cout<<"nextNode:"<<nextNode<<endl;
+//             cout<<"minLink:"<<minLink<<endl;
+//             // if (m_vAllLinks[minLink].GetAvaialbeKeys() > THRESHOLD)
+//             if (m_vAllLinks[minLink].wait_or_not == false)
+//             {
+//                 m_vAllLinks[minLink].ConsumeKeys(demandIter->second);
+//                 // 从当前节点上移除已经转发的需求数据量 (demandIter->second)。如果当前节点是该需求的源节点，调用 ReduceVolume 减少需求的剩余数据量
+//                 // ？？仅在需求在源节点被传输后，才减少数据量，中间节点没有这个操作，不知道是否符合逻辑
+//                 cout << "demandIter->second" << demandIter->second << endl;
+//                 if (nodeIter->first == m_vAllDemands[demandIter->first].GetSourceId())
+//                 {
+//                     cout << "nodeIter->first" << nodeIter->first << endl;
+//                     cout << "m_vAllDemands[demandIter->first].GetSourceId()" << m_vAllDemands[demandIter->first].GetSourceId() << endl;
+//                     m_vAllDemands[demandIter->first].ReduceVolume(demandIter->second);
+//                 }
+
+//                 m_vAllNodes[nodeIter->first].m_mRelayVolume[demandIter->first] -= demandIter->second;
+
+//                 // 当需求从此节点完全传输，则删除此节点上m_mRelayVolume对应的需求
+//                 if (m_vAllNodes[nodeIter->first].m_mRelayVolume[demandIter->first] <= INFSMALL)  // 这里可能有问题
+//                 // if (m_vAllNodes[nodeIter->first].m_mRelayVolume[demandIter->first] <= 1)  // 这里可能有问题
+//                 {
+//                     m_vAllNodes[nodeIter->first].m_mRelayVolume.erase(demandIter->first);
+//                     // 对link.m_lCarriedDemands进行删除
+//                     m_vAllLinks[minLink].m_lCarriedDemands.erase(demandIter->first);
+//                     // if (m_vAllLinks[minLink].m_lCarriedDemands.find(demandIter->first) == m_vAllLinks[minLink].m_lCarriedDemands.end())
+//                     // {
+//                     //     m_vAllLinks[minLink].m_lCarriedDemands.erase(demandIter->first);
+//                     // }
+//                 }
+                
+//                 // 如果 nextNode 是需求的目标节点（汇节点），则调用 UpdateDeliveredVolume 更新已传输的数据量，并结束本次中继操作。如果 nextNode 不是汇节点，则将需求数据量添加到下一个节点的中继列表中
+//                 if (nextNode == m_vAllDemands[demandIter->first].GetSinkId())
+//                 {
+//                     m_vAllDemands[demandIter->first].UpdateDeliveredVolume(demandIter->second, m_dSimTime);
+//                     continue;
+//                 }
+
+//                 if (demandIter->second != 0)
+//                 {
+//                     m_vAllNodes[nextNode].m_mRelayVolume[demandIter->first] += demandIter->second;
+
+//                     // 对下一条链路link.m_lCarriedDemands进行添加
+//                     NODEID nextNextNode = m_vAllDemands[demandIter->first].m_Path.m_mNextNode[nextNode];
+//                     LINKID nextMinLink = m_mNodePairToLink[make_pair(nextNode, nextNextNode)];
+//                     if (m_vAllLinks[nextMinLink].m_lCarriedDemands.find(demandIter->first) == m_vAllLinks[nextMinLink].m_lCarriedDemands.end())
+//                     {
+//                         m_vAllLinks[nextMinLink].m_lCarriedDemands.insert(demandIter->first);
+//                         cout<< "--------------------------------------------------------" <<endl;
+//                         cout<< m_vAllLinks[nextMinLink].GetLinkId() << "insert" << demandIter->first << endl;
+//                     }
+//                 }
+//             }
+//         }
+//     }
+//     // 调用 UpdateRemainingKeys，根据执行时间 executeTime 更新所有链路上的剩余密钥数量
+//     UpdateRemainingKeys(executeTime, m_dSimTime);
+// }
+
 void CNetwork::RelayForOneHop(TIME executeTime, map<NODEID, map<DEMANDID, VOLUME>> &relayDemands)
 {
     std::cout<<"进入RelayForOneHop阶段，进行调度方案执行"<< std::endl;
@@ -1547,7 +1639,6 @@ void CNetwork::RelayForOneHop(TIME executeTime, map<NODEID, map<DEMANDID, VOLUME
         {
             // 对于每个需求，从其路径中找到下一个要中继到的节点 nextNode
             NODEID nextNode = m_vAllDemands[demandIter->first].m_Path.m_mNextNode[nodeIter->first];
-
             // 找到当前节点和下一个节点之间的链路 minLink，并在该链路上消耗相应的密钥数量（等于转发的数据量）
             LINKID minLink = m_mNodePairToLink[make_pair(nodeIter->first, nextNode)];
             cout<<"nextNode:"<<nextNode<<endl;
@@ -1948,9 +2039,14 @@ void CNetwork::StoreSimResInDb(){
 void CNetwork::RunInBackGround(){
     while (!AllDemandsDelivered())
     {
+        usleep(100000);
         std::unique_lock<std::mutex> lock(mtx);
         while (status!="Running")
         {
+            if(status=="End"){
+                cout<<"重置"<<endl;
+                return;
+            }
             cv.wait(lock);
             cout<<"thread被唤醒"<<endl;
         }
