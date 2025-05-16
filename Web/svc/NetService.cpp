@@ -1,4 +1,10 @@
 #include "Web/svc/NetService.hpp"
+#include "oatpp/web/client/HttpRequestExecutor.hpp"
+#include "oatpp/network/tcp/client/ConnectionProvider.hpp"
+
+#include "oatpp/parser/json/mapping/ObjectMapper.hpp"
+#include "Web/client/ControlClient.hpp"
+
 #include <dirent.h>  // 用于读取目录
 #include <thread>
 
@@ -327,16 +333,56 @@ bool NetService::start(int routeAlg,int scheduleAlg){
 }
 
 bool NetService::allStart(){
-    for(int routeAlg=0;routeAlg<2;routeAlg++){
+    if(ConfigReader::getStr("role")=="master"&&ConfigReader::getStr("worker")!=""){
+        //
         for(int scheduleAlg=0;scheduleAlg<2;scheduleAlg++){
-            start(routeAlg,scheduleAlg);
+            start(0,scheduleAlg);
+        }
+        for(int scheduleAlg=0;scheduleAlg<2;scheduleAlg++){
+            begin(true,0,scheduleAlg);
+        }
+
+        string workerIp = ConfigReader::getStr("worker");
+        unsigned int workerPort = ConfigReader::getInt("worker_port");
+        for(int scheduleAlg=0;scheduleAlg<2;scheduleAlg++){
+            auto connectionProvider = oatpp::network::tcp::client::ConnectionProvider::createShared({workerIp, workerPort});
+            auto httpExecutor= oatpp::web::client::HttpRequestExecutor::createShared(connectionProvider);
+            auto objectMapper = oatpp::parser::json::mapping::ObjectMapper::createShared();
+            auto client=ControlClient::createShared(httpExecutor,objectMapper);
+            auto data=client->start("",1,scheduleAlg)->readBodyToString();
+            if(data!="OK"){
+                //TODO:
+                cerr<<"worker sim start() error"<<endl;
+            }
+        }
+        for(int scheduleAlg=0;scheduleAlg<2;scheduleAlg++){
+            auto connectionProvider = oatpp::network::tcp::client::ConnectionProvider::createShared({workerIp, workerPort});
+            auto httpExecutor= oatpp::web::client::HttpRequestExecutor::createShared(connectionProvider);
+            auto objectMapper = oatpp::parser::json::mapping::ObjectMapper::createShared();
+            auto client=ControlClient::createShared(httpExecutor,objectMapper);
+            auto data=client->begin("",1,1,scheduleAlg)->readBodyToString();
+            begin(true,0,scheduleAlg);
+            if(data!="OK"){
+                //TODO:
+                cerr<<"worker sim begin() error"<<endl;
+            }
+        }
+        
+    }
+    else{
+        //单节点
+        for(int routeAlg=0;routeAlg<2;routeAlg++){
+            for(int scheduleAlg=0;scheduleAlg<2;scheduleAlg++){
+                start(routeAlg,scheduleAlg);
+            }
+        }
+        for(int routeAlg=0;routeAlg<2;routeAlg++){
+            for(int scheduleAlg=0;scheduleAlg<2;scheduleAlg++){
+                begin(true,routeAlg,scheduleAlg);
+            }
         }
     }
-    for(int routeAlg=0;routeAlg<2;routeAlg++){
-        for(int scheduleAlg=0;scheduleAlg<2;scheduleAlg++){
-            begin(true,routeAlg,scheduleAlg);
-        }
-    }
+    
 
     return true;
    
@@ -349,7 +395,7 @@ void NetService::begin(bool on,int routeAlg,int scheduleAlg){
     if(status.status=="Complete"){
         return;
     }
-
+    
     {
         if(on){
             int success=simDao.setSimStatus(network.simID,"Running");

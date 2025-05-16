@@ -272,7 +272,7 @@
         let schedulingAlgorithmParam = (schedulingAlgorithm === 'minRemainingTime') ? 0 : 1;
 
         // 构造请求 URL，使用查询参数传递数据
-        const url = `${apiBaseUrl}/sim/start?routingAlgorithm=${routingAlgorithmParam}&schedulingAlgorithm=${schedulingAlgorithmParam}`;
+        const url = `${apiBaseUrl}/sim/allStart?routingAlgorithm=${routingAlgorithmParam}&schedulingAlgorithm=${schedulingAlgorithmParam}`;
 
         try {
             // 发起POST请求（使用POST方法，通过查询参数传递）

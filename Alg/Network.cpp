@@ -42,6 +42,8 @@ void CNetwork::Clear()
     m_dSimTime = 0;
     FaultTime = -1;
     m_step = 0;
+    simID=rand()%UINT32_MAX;
+    status="Init";
     m_vAllNodes.clear();
     m_vAllLinks.clear();
     m_vAllDemands.clear();

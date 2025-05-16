@@ -31,12 +31,27 @@ public:
     {}
 public:
 
-    ENDPOINT("POST", "/api/v1/sim/start", simStart,QUERY(Int32, routeAlg, "routingAlgorithm"),QUERY(Int32, scheduleAlg, "schedulingAlgorithm")) {
+    ENDPOINT("POST", "/api/v1/sim/allStart", simAllStart,QUERY(Int32, routeAlg, "routingAlgorithm"),QUERY(Int32, scheduleAlg, "schedulingAlgorithm")) {
         //启动
         OATPP_LOGI("Sim","Start with route alg %d, schedule alg %d",routeAlg.getValue(0),scheduleAlg.getValue(0));
 
         // bool success=netService->start(routeAlg.getValue(0),scheduleAlg.getValue(0));
         bool success=netService->allStart();
+        if(success){
+            return createResponse(Status::CODE_200,"OK");
+        }else{
+            return createResponse(Status::CODE_400,"路由或调度策略的参数非法");
+        }
+
+    }
+
+    
+    ENDPOINT("POST", "/api/v1/sim/start", simStart,QUERY(Int32, routeAlg, "routingAlgorithm"),QUERY(Int32, scheduleAlg, "schedulingAlgorithm")) {
+        //启动
+        OATPP_LOGI("Sim","Start with route alg %d, schedule alg %d",routeAlg.getValue(0),scheduleAlg.getValue(0));
+
+        // bool success=netService->start(routeAlg.getValue(0),scheduleAlg.getValue(0));
+        bool success=netService->start(routeAlg.getValue(0),scheduleAlg.getValue(0));
         if(success){
             return createResponse(Status::CODE_200,"OK");
         }else{
@@ -59,25 +74,25 @@ public:
         return createDtoResponse(Status::CODE_200,res);
     }
 
-    ENDPOINT("POST", "/api/v1/sim/nextStep", nextStep) {
-        //下一步
-        OATPP_LOGI("Sim","nextStep");
+    // ENDPOINT("POST", "/api/v1/sim/nextStep", nextStep) {
+    //     //下一步
+    //     OATPP_LOGI("Sim","nextStep");
 
-        netService->nextStep();
-        auto res=netService->getSimStatus(0,0);
+    //     netService->nextStep();
+    //     auto res=netService->getSimStatus(0,0);
         
-        return createDtoResponse(Status::CODE_200,res);
-    }
+    //     return createDtoResponse(Status::CODE_200,res);
+    // }
     
-    ENDPOINT("POST", "/api/v1/sim/next10Step", next10Step) {
-        //下十步
-        OATPP_LOGI("Sim","nextStep");
+    // ENDPOINT("POST", "/api/v1/sim/next10Step", next10Step) {
+    //     //下十步
+    //     OATPP_LOGI("Sim","nextStep");
 
-        netService->next10Step();
-        auto res=netService->getSimStatus(0,0);
+    //     netService->next10Step();
+    //     auto res=netService->getSimStatus(0,0);
         
-        return createDtoResponse(Status::CODE_200,res);
-    }
+    //     return createDtoResponse(Status::CODE_200,res);
+    // }
 
     ENDPOINT("GET", "/api/v1/sim/res", getSimRes) {
         //下一步

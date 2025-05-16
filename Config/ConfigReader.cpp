@@ -48,6 +48,11 @@ std::string ConfigReader::getStr(const std::string& key, const std::string& defa
     return it != cfg.config_.end() ? it->second : default_value;
 }
 
+ void ConfigReader::setStr(const std::string& key,const std::string& value){
+    auto& cfg = instance();
+    cfg.config_[key]=value;
+ }
+
 int ConfigReader::getInt(const std::string& key, int default_value) {
     std::string value = getStr(key);
     try {

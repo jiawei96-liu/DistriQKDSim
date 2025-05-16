@@ -32,7 +32,7 @@ int SimDao::batchInsertSimulationResults(int simId,int step,double currentTime,v
         }
 
         // **开启事务**
-        con->setAutoCommit(false);
+        // con->setAutoCommit(false);
 
         // **拼接 SQL 语句**
         string sql = "INSERT INTO SimulationResults (StepID, DemandID, NodeID, NextNodeID, NextHopLinkID, AvailableKeys, RemainVolume, Status, IsRouteFailed) VALUES ";
@@ -52,7 +52,7 @@ int SimDao::batchInsertSimulationResults(int simId,int step,double currentTime,v
         stmt->execute(sql);
 
         // **提交事务**
-        con->commit();
+        // con->commit();
 
         cout << "Batch insert completed!" << endl;
 

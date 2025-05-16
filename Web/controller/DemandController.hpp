@@ -3,7 +3,7 @@
 
 #include "Web/dto/DTOs.hpp"
 #include "Web/svc/NetService.hpp"
-
+#include "Web/client/ControlClient.hpp"
 
 #include "oatpp/web/server/api/ApiController.hpp"
 #include "oatpp/core/macro/codegen.hpp"
@@ -12,6 +12,8 @@
 #include "oatpp/core/data/stream/Stream.hpp"
 #include "oatpp/core/data/stream/FileStream.hpp"
 
+#include "oatpp/web/client/HttpRequestExecutor.hpp"
+#include "oatpp/network/tcp/client/ConnectionProvider.hpp"
 
 #include "oatpp/web/mime/multipart/FileProvider.hpp"
 #include "oatpp/web/mime/multipart/InMemoryDataProvider.hpp"
@@ -54,9 +56,29 @@ public:
     ENDPOINT("POST", "/api/v1/select/demand/{fileName}", selectDemand,PATH(String,fileName)) {
         //为仿真选择需求文件
         OATPP_LOGI("Select","Select Demand %s",fileName.getValue("").c_str());
+        if(ConfigReader::getStr("role") == "master"&&ConfigReader::getStr("worker")!=""){
+            // 获取worker的IP和端口
+            string workerIp = ConfigReader::getStr("worker");
+            unsigned int workerPort = ConfigReader::getInt("worker_port");
+
+            
+            auto connectionProvider = oatpp::network::tcp::client::ConnectionProvider::createShared({workerIp, workerPort});
+            auto httpExecutor= oatpp::web::client::HttpRequestExecutor::createShared(connectionProvider);
+            auto client=ControlClient::createShared(httpExecutor,this->getDefaultObjectMapper());
+
+            auto data=client->selectDemand(fileName.getValue(""),"")->readBodyToString();
+
+            if(data=="OK") {
+                OATPP_LOGI("Forward", "Request forwarded to worker successfully.");
+            } else {
+                OATPP_LOGE("Forward", "Failed to forward request to worker.");
+                return createResponse(Status::CODE_500,"worker节点异常");
+            }
+        }
         netService->selectDemands(fileName.getValue(""));
-        auto result=netService->getAllDemands();
-        return createDtoResponse(Status::CODE_200,result);
+        // auto result=netService->getAllDemands();
+        // return createDtoResponse(Status::CODE_200,result);
+        return createResponse(Status::CODE_200,"OK");
     }
 
 
@@ -73,7 +95,7 @@ public:
         auto part1 = multipart->getNamedPart("file");
 
         OATPP_LOGD("Multipart", "parts_count=%d", multipart->count());
-    
+
         
         /* Assert part is not null */
     
