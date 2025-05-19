@@ -4,6 +4,10 @@
 #include <fstream>
 #include <cstring>
 #include <cstdarg>
+#include <iostream>
+#include <iomanip>
+#include <sstream>
+#include <ctime>
 
 oatpp::String StaticFilesManager::getExtension(const oatpp::String& filename) {
   v_int32 dotPos = 0;
@@ -70,3 +74,12 @@ v_int64 getMillisTickCount(){
   return millis.count();
 }
 
+std::string getCurrentTimeString() {
+    std::time_t now = std::time(nullptr);
+    std::tm* localTime = std::localtime(&now);
+
+    std::ostringstream oss;
+    oss << std::put_time(localTime, "%Y-%m-%d %H:%M:%S");  // 精确到秒
+
+    return oss.str();
+}

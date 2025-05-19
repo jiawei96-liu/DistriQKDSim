@@ -6,8 +6,7 @@ project(DistriQKDSim)
 
 set(CMAKE_CXX_STANDARD 17)
 
-# 添加子目录
-
+# 添加子目�?
 
 add_subdirectory(Alg)
 

@@ -9,6 +9,7 @@ CREATE TABLE Simulations (
     SimID              INT PRIMARY KEY,
     GroupID            INT NOT NULL,
     Name               VARCHAR(255) NOT NULL,
+    CreateTime          VARCHAR(20),
     Status             VARCHAR(31) NOT NULL,
     RouteAlg            VARCHAR(63) NOT NULL,
     ScheduleAlg          VARCHAR(63) NOT NULL,

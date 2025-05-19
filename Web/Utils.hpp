@@ -28,5 +28,6 @@ public:
 
 oatpp::String formatText(const char* text, ...);
 v_int64 getMillisTickCount();
+std::string getCurrentTimeString();
 
 #endif /* Utils_hpp */

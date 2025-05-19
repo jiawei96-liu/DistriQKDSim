@@ -28,8 +28,17 @@ public:
     int setSimStatus(int simId,string status);
     int setSimStepAndTime(int simId,int step,int currentTime);
     int createSim(int simId,int groupId,string name,string routeAlg,string scheduleAlg);
+    int clear();
+    int getAllSims(vector<SimStatusDto>& res);
+    
+    //导出仿真结果文件
+    int exportSimResToStream(int simId, std::stringstream& ss);
 private:
     sql::mysql::MySQL_Driver* driver;
     std::unique_ptr<sql::Connection> con;
+    std::string host;
+    std::string user;
+    std::string password;
+    std::string database;
 };
 

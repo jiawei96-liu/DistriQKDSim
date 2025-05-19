@@ -76,7 +76,7 @@ void runWorker() {
 int main(int argc, const char * argv[]) {
 
   oatpp::base::Environment::init();
-
+    std::srand(999);
     if(argc < 2) {
         OATPP_LOGE("Main", "Missing role argument (master/worker)");
         return 1;

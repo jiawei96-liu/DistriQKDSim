@@ -72,6 +72,16 @@ public:
 
     return response;
   }
+  ENDPOINT("POST", "api/v1/route/upload-code", uploadRoute, BODY_DTO(Object<CodeDto>, dto),REQUEST(std::shared_ptr<IncomingRequest>, request)) {
+        auto fileName=dto->name;
+        auto code=dto->code;
+        
+        oatpp::data::stream::FileOutputStream fileOutputStream(std::string("../Alg/Route/" + fileName.getValue("")).c_str());
+        fileOutputStream.writeSimple(code);
+
+    
+        return createResponse(Status::CODE_200, "OK");
+    }   
 
 };
 

@@ -28,6 +28,7 @@ class ControlClient : public oatpp::web::client::ApiClient {
 
   API_CALL("POST", "api/v1/sim/start", start,BODY_STRING(String, body),QUERY(Int32, routeAlg, "routingAlgorithm"),QUERY(Int32, scheduleAlg, "schedulingAlgorithm"))
   API_CALL("POST", "api/v1/sim/begin", begin, BODY_STRING(String, body),QUERY(UInt32, on, "on"),QUERY(Int32, routeAlg, "routingAlgorithm"),QUERY(Int32, scheduleAlg, "schedulingAlgorithm"))
+  API_CALL("POST","api/v1/sim/reset",reset)
 
 
   API_CALL("PUT", "anything/{parameter}", doPutAnything, PATH(String, parameter), BODY_STRING(String, body))
