@@ -74,6 +74,58 @@ int SimDao::batchInsertSimulationResults(int simId,int step,double currentTime,v
     }
 }
 
+int SimDao::batchInsertSimulationResultsAndMetric(int simId,SimMetric metric,vector<SimResultStatus> &simRes) {
+    if(simRes.size()==0){
+        return 1;
+    }
+    try {
+        sql::PreparedStatement* pstmt;
+
+        // **连接 MySQL**
+        
+
+        // **获取或创建 StepID**
+        int stepID = getOrCreateStepID(simId, metric);
+        if (stepID == -1) {
+            cerr << "Failed to get or create StepID!" << endl;
+            return -1;
+        }
+
+        // **开启事务**
+        // con->setAutoCommit(false);
+
+        // **拼接 SQL 语句**
+        string sql = "INSERT INTO SimulationResults (StepID, DemandID, NodeID, NextNodeID, NextHopLinkID, AvailableKeys, RemainVolume, Status, IsRouteFailed) VALUES ";
+
+        for (size_t i = 0; i < simRes.size(); i++) {
+            sql += "(" + to_string(stepID) + ", " + to_string(simRes[i].demandId) + ", " +
+                   to_string(simRes[i].nodeId) + ", " + to_string(simRes[i].nextNode) + ", " +
+                   to_string(simRes[i].minLink) + ", " + to_string(simRes[i].availableKeys) + ", " +
+                   to_string(simRes[i].remainVolume) + ", '" + 
+                   (simRes[i].isDelivered ? "DELIVERED" : (simRes[i].isWait ? "WAIT" : "IN_PROGRESS")) + "', '" +
+                   (simRes[i].isRouteFailed ? "YES" : "NO") + "')";
+            if (i < simRes.size() - 1) sql += ", ";
+        }
+
+        // **执行拼接好的 SQL 语句**
+
+        auto stmt = con->createStatement();
+        stmt->execute(sql);
+
+        // **提交事务**
+        // con->commit();
+
+        cout << "Batch insert completed!" << endl;
+
+        // **释放资源**
+        delete stmt;
+        return 1;
+    } catch (sql::SQLException &e) {
+        cerr << "SQL Error (batchInsertSimulationResults): " << e.what() << endl;
+        return -1;
+    }
+}
+
 // **获取或创建 StepID**
 int SimDao::getOrCreateStepID(int simId, int step, double currentTime) {
     try {
@@ -102,6 +154,62 @@ int SimDao::getOrCreateStepID(int simId, int step, double currentTime) {
         pstmt->setInt(1, simId);
         pstmt->setInt(2, step);
         pstmt->setDouble(3, currentTime);
+        pstmt->executeUpdate();
+
+        delete pstmt;
+
+        // 获取刚插入的 StepID
+        pstmt = con->prepareStatement("SELECT LAST_INSERT_ID()");
+        res = pstmt->executeQuery();
+        int newStepID = res->next() ? res->getInt(1) : -1;
+
+        delete res;
+        delete pstmt;
+        return newStepID;
+    } catch (sql::SQLException &e) {
+        cerr << "SQL Error (getOrCreateStepID): " << e.what() << endl;
+        return -1;
+    }
+}
+
+int SimDao::getOrCreateStepID(int simId, SimMetric metric) {
+    try {
+        // 查询 StepID
+        auto pstmt = con->prepareStatement(
+            "SELECT StepID FROM SimulationSteps WHERE SimID = ? AND Step = ?"
+        );
+        pstmt->setInt(1, simId);
+        pstmt->setInt(2, metric.step);
+        auto res = pstmt->executeQuery();
+
+        if (res->next()) {
+            int stepID = res->getInt("StepID");
+            delete res;
+            delete pstmt;
+            return stepID;
+        }
+
+        delete res;
+        delete pstmt;
+
+        // **Step 不存在，插入新 Step**
+        pstmt = con->prepareStatement(
+            "INSERT INTO SimulationSteps "
+            "(SimID, Step, CurrentTime, TransferredVolume, TransferredPercent, "
+            "RemainingVolume, TransferRate, InProgressDemandCount) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        );
+
+        // 设置各字段的值
+        pstmt->setInt(1, simId);
+        pstmt->setInt(2, metric.step);
+        pstmt->setDouble(3, metric.CurrentTime);
+        pstmt->setDouble(4, metric.TransferredVolume);
+        pstmt->setDouble(5, metric.TransferredPercent);
+        pstmt->setDouble(6, metric.RemainingVolume);
+        pstmt->setDouble(7, metric.TransferRate);
+        pstmt->setInt(8, metric.InProgressDemandCount);
+
         pstmt->executeUpdate();
 
         delete pstmt;
@@ -494,4 +602,45 @@ int SimDao::exportSimResToStream(int simId, std::stringstream& ss) {
         std::cerr << "Export error: " << e.what() << std::endl;
         return -1;
     }
+}
+
+int SimDao::getSimMetric(int simId,int step,SimMetricDto& ret){
+    try {
+        std::unique_ptr<sql::Connection> con(driver->connect(host, user, password));
+        con->setSchema(database);
+
+        std::unique_ptr<sql::PreparedStatement> pstmt(
+            con->prepareStatement(
+                "SELECT StepID, SimID, Step, CurrentTime, "
+                "TransferredVolume, TransferredPercent, RemainingVolume, "
+                "TransferRate, InProgressDemandCount "
+                "FROM SimulationSteps WHERE SimID = ? AND Step = ?"
+            )
+        );
+
+        pstmt->setInt(1, simId);
+        pstmt->setInt(2, step);
+
+        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
+
+        if (res->next()) {
+            ret.stepId = res->getInt("StepID");
+            ret.simId = res->getInt("SimID");
+            ret.step = res->getInt("Step");
+            ret.currentTime = res->getDouble("CurrentTime");
+            ret.transferredVolume = res->getDouble("TransferredVolume");
+            ret.transferredPercent = res->getDouble("TransferredPercent");
+            ret.remainingVolume = res->getDouble("RemainingVolume");
+            ret.transferRate = res->getDouble("TransferRate");
+            ret.inProgressDemandCount = res->getDouble("InProgressDemandCount");
+            return 1; // 成功
+        } else {
+            return 0; // 未找到对应记录
+        }
+
+    } catch (sql::SQLException &e) {
+        std::cerr << "SQL error: " << e.what() << std::endl;
+        return -1; // 数据库异常
+    }
+    
 }

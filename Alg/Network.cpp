@@ -1,5 +1,6 @@
 ﻿#include "Network.h"
 #include "Link.h"
+#include "DistributedIDGenerator.h"
 #include <iostream>
 #include <chrono>
 #include <queue>
@@ -14,7 +15,7 @@ CNetwork::CNetwork(void):simDao()
     m_dSimTime = 0;
     FaultTime = -1;
     m_step = 0;
-    simID=rand()%UINT32_MAX;
+    simID=DistributedIDGenerator::next_id();
     status="Init";
     // currentRouteAlg = [this](NODEID sourceId, NODEID sinkId, list<NODEID>& nodeList, list<LINKID>& linkList) -> bool
     // {
@@ -1952,6 +1953,7 @@ void CNetwork::StoreSimRes(){
 
 void CNetwork::StoreSimResInDb(){
     vector<SimResultStatus> res;
+    int inProgress=0;
     for (NODEID nodeId = 0; nodeId < GetNodeNum(); nodeId++)
     {
         for (auto demandIter = m_vAllNodes[nodeId].m_mRelayVolume.begin(); demandIter != m_vAllNodes[nodeId].m_mRelayVolume.end();)
@@ -1981,6 +1983,9 @@ void CNetwork::StoreSimResInDb(){
             TIME completeTime = m_vAllDemands[demandId].GetCompleteTime();
             bool isRouteFailed = m_vAllDemands[demandId].GetRoutedFailed();
             bool isWait = m_vAllLinks[minLink].wait_or_not;
+            if(!isWait){
+                inProgress++;
+            }
 
             obj.demandId=demandId;
             obj.nodeId=nodeId;
@@ -2026,7 +2031,10 @@ void CNetwork::StoreSimResInDb(){
         }
     }
 
-    int success=simDao.batchInsertSimulationResults(simID,CurrentStep(),CurrentTime(),res);
+    // int success=simDao.batchInsertSimulationResults(simID,CurrentStep(),CurrentTime(),res);
+    SimMetric metric=getCurrentMetric();
+    metric.InProgressDemandCount=inProgress;
+    int success=simDao.batchInsertSimulationResultsAndMetric(simID,metric,res);
     if(success!=1){
         cout<<"failed to store sim res"<<endl;
     }
@@ -2036,10 +2044,31 @@ void CNetwork::StoreSimResInDb(){
     }
 }
 
+//不包含INPROGRESS获取
+SimMetric CNetwork::getCurrentMetric(){
+    SimMetric ret;
+    VOLUME allVolume=0;
+    ret.step=CurrentStep();
+    ret.CurrentTime=CurrentTime();
+    ret.TransferredVolume=0;
+    for(auto& demand:m_vAllDemands){
+        ret.TransferredVolume +=demand.GetDeliveredVolume();
+        ret.RemainingVolume +=demand.GetRemainingVolume();
+        allVolume+=demand.GetDemandVolume();
+    }
+    if(allVolume!=0){
+        ret.TransferredPercent=ret.TransferredVolume/allVolume;
+    }
+    if(CurrentTime()!=0){
+        ret.TransferRate=ret.TransferredVolume/CurrentTime();
+    }
+    return ret;
+}
+
 void CNetwork::RunInBackGround(){
     while (!AllDemandsDelivered())
     {
-        usleep(100000);
+        sleep(1);
         std::unique_lock<std::mutex> lock(mtx);
         while (status!="Running")
         {

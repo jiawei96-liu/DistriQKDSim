@@ -21,7 +21,13 @@ CREATE TABLE SimulationSteps (
     StepID SERIAL PRIMARY KEY,   -- 唯一标识Step
     SimID INT REFERENCES Simulations(SimID) ON DELETE CASCADE, -- 关联仿真
     Step INT NOT NULL,           -- 当前Step编号
-    CurrentTime DOUBLE PRECISION NOT NULL -- 该Step对应的时间
+    CurrentTime DOUBLE PRECISION NOT NULL, -- 该Step对应的时间
+
+    TransferredVolume DOUBLE NOT NULL DEFAULT 0,   -- 已传输数据量
+    TransferredPercent DOUBLE PRECISION NOT NULL DEFAULT 0,  -- 已传输需求的百分比 (0~100)
+    RemainingVolume DOUBLE NOT NULL DEFAULT 0,     -- 剩余传输数据量
+    TransferRate DOUBLE PRECISION NOT NULL DEFAULT 0,    -- 传输速率
+    InProgressDemandCount INT NOT NULL DEFAULT 0   -- InProgress需求数量
 );
 
 CREATE TABLE SimulationResults (
@@ -36,6 +42,7 @@ CREATE TABLE SimulationResults (
     Status VARCHAR(16),
     IsRouteFailed VARCHAR(16) -- 可选值：YES/NO
 );
+
 
 
 /* CREATE TABLE SimResult(

@@ -53,9 +53,9 @@ public:
         OATPP_LOGI("Sim","Start with route alg %d, schedule alg %d",routeAlg.getValue(0),scheduleAlg.getValue(0));
 
         // bool success=netService->start(routeAlg.getValue(0),scheduleAlg.getValue(0));
-        bool success=netService->start(routeAlg.getValue(0),scheduleAlg.getValue(0));
-        if(success){
-            return createResponse(Status::CODE_200,"OK");
+        int simID=netService->start(routeAlg.getValue(0),scheduleAlg.getValue(0));
+        if(simID!=0){
+            return createResponse(Status::CODE_200,to_string(simID));
         }else{
             return createResponse(Status::CODE_400,"路由或调度策略的参数非法");
         }
@@ -208,6 +208,13 @@ public:
         return response;
     }
 
+
+    //Metric
+    ENDPOINT("GET","/api/v1/sim/metrics",getSimMetrics,QUERY(UInt32, step, "step"),QUERY(Int32, routeAlg, "routingAlgorithm",0),QUERY(Int32, scheduleAlg, "schedulingAlgorithm",0),QUERY(Int32,simId,"simId",0)){
+        OATPP_LOGI("Sim","getSimResByStep");
+        auto res=netService->getSimMetric(routeAlg.getValue(0),scheduleAlg.getValue(0),step.getValue(0),simId.getValue(0));
+        return createDtoResponse(Status::CODE_200,res);
+    }
 };
 
 #include OATPP_CODEGEN_END(ApiController) //<-- End Codegen

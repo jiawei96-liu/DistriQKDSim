@@ -69,6 +69,7 @@ public:
 
     oatpp::Object<SimStatusDto> getSimStatus(int route,int sched,int simID=0);
     oatpp::Object<SimResStatusDto> getSimResStatusByStep(int route,int sched,int step,int simId=0);
+    oatpp::Object<SimMetricDto> getSimMetric(int route,int sched,int step,int simId=0);
 
     oatpp::Object<ListDto<oatpp::Object<SimStatusDto>>> getHistorySims();
     int deleteSimById(int simId);
@@ -80,7 +81,8 @@ public:
 
     void Clear();
 
-    bool start(int routeAlg,int scheduleAlg);
+    //返回simID，为0则异常
+    int start(int routeAlg,int scheduleAlg);
 
     bool allStart();
 };

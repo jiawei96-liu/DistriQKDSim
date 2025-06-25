@@ -311,6 +311,22 @@ oatpp::Object<SimResStatusDto> NetService::getSimResStatusByStep(int route,int s
     return ret;
 }
 
+oatpp::Object<SimMetricDto> NetService::getSimMetric(int route,int sched,int step,int simId){
+    
+    SimMetricDto res;
+    TIME currentTime;
+    if(simId==0){
+        auto &network=*networks[route*2+sched];
+        // simDao.getSimRes(network.simID,step,res,currentTime);
+        simDao.getSimMetric(network.simID,step,res);
+    }else{
+        simDao.getSimMetric(simId,step,res);
+    }
+    
+    auto ret=SimMetricDto::createShared(res);
+    return ret;
+}
+
 void NetService::nextStep(){
     // if (!network.AllDemandsDelivered())
     // {
@@ -325,7 +341,7 @@ void NetService::next10Step(){
     }
 }
 
-bool NetService::start(int routeAlg,int scheduleAlg){
+int NetService::start(int routeAlg,int scheduleAlg){
 
     auto &network=*networks[routeAlg*2+scheduleAlg];
     // simDao.clear();
@@ -358,7 +374,7 @@ bool NetService::start(int routeAlg,int scheduleAlg){
     std::thread backgroundThread(&CNetwork::RunInBackGround, &network);
     backgroundThread.detach();
     
-    return true;
+    return network.simID;
 }
 
 bool NetService::allStart(){
@@ -378,11 +394,16 @@ bool NetService::allStart(){
             auto httpExecutor= oatpp::web::client::HttpRequestExecutor::createShared(connectionProvider);
             auto objectMapper = oatpp::parser::json::mapping::ObjectMapper::createShared();
             auto client=ControlClient::createShared(httpExecutor,objectMapper);
-            auto data=client->start("",1,scheduleAlg)->readBodyToString();
-            if(data!="OK"){
+            auto resp=client->start("",1,scheduleAlg);
+            string simIdStr=resp->readBodyToString();
+            if(resp->getStatusCode()!=200||simIdStr=="0"){
                 //TODO:
                 cerr<<"worker sim start() error"<<endl;
+            }else{
+                int simId=stoi(simIdStr);
+                networks[2+scheduleAlg]->simID=simId;
             }
+            
         }
         for(int scheduleAlg=0;scheduleAlg<2;scheduleAlg++){
             auto connectionProvider = oatpp::network::tcp::client::ConnectionProvider::createShared({workerIp, workerPort});

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <title>仿真对比</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <style>
+    .container { padding: 20px; }
+    table { width: 100%; margin-top: 20px; border-collapse: collapse; }
+    th, td { text-align: center; font-family: monospace; padding: 10px; border: 1px solid #dee2e6; }
+    thead th { background-color: #f8f9fa; position: sticky; top: 0; z-index: 1; }
+    .controls input { width: 80px; display: inline-block; margin-left: 10px; margin-right: 10px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">仿真对比</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/" id="inputInfoLink">输入信息</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/sim.html" id="simulationResultLink">仿真结果</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/routeCode.html" id="relayPathLink">路由策略</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/history.html" id="relayPathLink">历史仿真</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <div class="d-flex align-items-center mb-3 controls">
+      <button class="btn btn-outline-secondary me-2" onclick="changeStep(-1)">« 前一步</button>
+      <button class="btn btn-outline-secondary me-2" onclick="changeStep(1)">» 后一步</button>
+      <button class="btn btn-outline-secondary me-2" onclick="changeStep(10)">+10 后十步</button>
+      <span class="me-2">当前步数: <strong id="currentStep">-</strong></span>
+      <span class="me-2">跳转到 Step:</span>
+      <input type="number" id="stepInput" class="form-control d-inline-block" />
+      <button class="btn btn-primary ms-2" onclick="jumpToStep()">跳转</button>
+    </div>
+
+    <table class="table table-bordered" id="compareTable">
+      <thead>
+        <tr>
+          <th>仿真</th>
+          <th id="id1">仿真1</th>
+          <th id="id2">仿真2</th>
+          <th id="id3">仿真3</th>
+          <th id="id4">仿真4</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><th>路由策略</th><td id="r1"></td><td id="r2"></td><td id="r3"></td><td id="r4"></td></tr>
+        <tr><th>调度策略</th><td id="s1"></td><td id="s2"></td><td id="s3"></td><td id="s4"></td></tr>
+        <tr><th>当前时间</th><td id="time1"></td><td id="time2"></td><td id="time3"></td><td id="time4"></td></tr>
+        <tr><th>已传输数据量</th><td id="volume1"></td><td id="volume2"></td><td id="volume3"></td><td id="volume4"></td></tr>
+        <tr><th>完成率</th><td id="percent1"></td><td id="percent2"></td><td id="percent3"></td><td id="percent4"></td></tr>
+        <tr><th>剩余数据量</th><td id="remain1"></td><td id="remain2"></td><td id="remain3"></td><td id="remain4"></td></tr>
+        <tr><th>传输速率</th><td id="rate1"></td><td id="rate2"></td><td id="rate3"></td><td id="rate4"></td></tr>
+        <tr><th>传输中需求数</th><td id="count1"></td><td id="count2"></td><td id="count3"></td><td id="count4"></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const ids = [urlParams.get('id1'), urlParams.get('id2'), urlParams.get('id3'), urlParams.get('id4')];
+    let step = parseInt(urlParams.get('step')) || 412;
+    
+    function getRouteAlgName(value) {
+    if (value === 0 || value === '0') return '最短路径优先';
+    if (value === 1 || value === '1') return '密钥速率优先';
+    return value;
+    }
+
+    function getScheduleAlgName(value) {
+    if (value === 0 || value === '0') return '最小任务剩余时间';
+    if (value === 1 || value === '1') return '平均密钥';
+    return value;
+    }
+
+    function loadData() {
+      document.getElementById('currentStep').innerText = step;
+
+      ids.forEach((id, idx) => {
+        if (!id) return;
+        const col = idx + 1;
+
+        axios.get(`/api/v1/sim/status?simId=${id}`).then(res => {
+          const sim = res.data;
+          document.getElementById(`id${col}`).innerText = sim.name;
+          document.getElementById(`r${col}`).innerText = getRouteAlgName(sim.routeAlg);
+          document.getElementById(`s${col}`).innerText = getScheduleAlgName(sim.scheduleAlg);
+        }).catch(() => {
+          document.getElementById(`id${col}`).innerText = '加载失败';
+        });
+
+        axios.get(`/api/v1/sim/metrics?step=${step}&simId=${id}`).then(res => {
+          const m = res.data;
+          document.getElementById(`time${col}`).innerText = m.currentTime.toFixed(2);
+          document.getElementById(`volume${col}`).innerText = m.transferredVolume.toFixed(2);
+          document.getElementById(`percent${col}`).innerText = (m.transferredPercent * 100).toFixed(1) + '%';
+          document.getElementById(`remain${col}`).innerText = m.remainingVolume.toFixed(2);
+          document.getElementById(`rate${col}`).innerText = m.transferRate.toFixed(2);
+          document.getElementById(`count${col}`).innerText = m.inProgressDemandCount;
+        }).catch(() => {
+          document.getElementById(`time${col}`).innerText = '无数据';
+          document.getElementById(`volume${col}`).innerText = '-';
+          document.getElementById(`percent${col}`).innerText = '-';
+          document.getElementById(`remain${col}`).innerText = '-';
+          document.getElementById(`rate${col}`).innerText = '-';
+          document.getElementById(`count${col}`).innerText = '-';
+        });
+      });
+    }
+
+    function changeStep(delta) {
+      step = Math.max(0, step + delta);
+      loadData();
+    }
+
+    function jumpToStep() {
+      const input = parseInt(document.getElementById('stepInput').value);
+      if (!isNaN(input) && input >= 0) {
+        step = input;
+        loadData();
+      } else {
+        alert('请输入合法的 step 数值');
+      }
+    }
+
+    loadData();
+  </script>
+</body>
+</html>

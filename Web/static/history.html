@@ -56,6 +56,7 @@
     <table class="table table-bordered" id="simTable">
       <thead>
         <tr>
+          <th><button class="btn btn-success" onclick="compareSelected()">对比</button></th>
           <th>ID</th>
           <th>名称</th>
           <th>创建时间</th>
@@ -71,6 +72,10 @@
         <!-- 数据行将由JS动态填充 -->
       </tbody>
     </table>
+
+
+
+    
   </div>
 </div>
 
@@ -87,6 +92,7 @@
           const row = document.createElement('tr');
 
           row.innerHTML = `
+          <td><input type="checkbox" class="compare-checkbox" value="${sim.id}"></td>
             <td>${sim.id}</td>
             <td>${sim.name}</td>
             <td>${sim.createTime}</td>
@@ -125,6 +131,18 @@
 
   function viewSimulation(simId) {
     window.location.href = `/history-detail.html?id=${encodeURIComponent(simId)}`;
+  }
+  
+  function compareSelected() {
+    const checkboxes = document.querySelectorAll('.compare-checkbox:checked');
+    if (checkboxes.length !== 4) {
+        alert('请选择恰好4个仿真进行对比');
+        return;
+    }
+
+    const ids = Array.from(checkboxes).map(cb => cb.value);
+    const query = ids.map((id, i) => `id${i + 1}=${encodeURIComponent(id)}`).join('&');
+    window.location.href = `/compare.html?${query}`;
   }
 
   // 页面加载时执行

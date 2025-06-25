@@ -100,6 +100,34 @@ class CodeDto : public oatpp::DTO {
     DTO_FIELD(String, code);
 };
 
+class SimMetricDto: public oatpp::DTO{
+    DTO_INIT(SimMetricDto,DTO)
+
+    DTO_FIELD(Int32,stepId);    
+    DTO_FIELD(Int32,simId);    
+    DTO_FIELD(Int32,step);  
+    DTO_FIELD(Float64,currentTime);
+
+    DTO_FIELD(Float64,transferredVolume);
+    DTO_FIELD(Float64,transferredPercent);
+    DTO_FIELD(Float64,remainingVolume);
+    DTO_FIELD(Float64,transferRate);
+    DTO_FIELD(Float64,inProgressDemandCount);
+
+    SimMetricDto()=default;
+    SimMetricDto(const SimMetricDto& that){
+        stepId=that.stepId;
+        simId=that.simId;
+        step=that.step;
+        currentTime=that.currentTime;
+        transferredVolume=that.transferredVolume;
+        transferredPercent=that.transferredPercent;
+        remainingVolume=that.remainingVolume;
+        transferRate=that.transferRate;
+        inProgressDemandCount=that.inProgressDemandCount;
+    }
+};
+
 #include OATPP_CODEGEN_END(DTO)
 
 #endif /* DTOs_hpp */

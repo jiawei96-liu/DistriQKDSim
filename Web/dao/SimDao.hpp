@@ -21,11 +21,14 @@ public:
 
     bool getAllSimRes(PageDto<SimResDto>& res,uint32_t offset,uint32_t limit);
     int batchInsertSimulationResults(int simId,int step,double currentTime,vector<SimResultStatus> &simRes); 
+    int batchInsertSimulationResultsAndMetric(int simId,SimMetric metric,vector<SimResultStatus> &simRes); 
     int getOrCreateStepID(int simId, int step, double currentTime);
+    int getOrCreateStepID(int simId, SimMetric metric);
     int deleteSimulations(int simId);
     int getSimRes(int simId, int step, vector<SimResDto>& res,TIME& currentTime);
     int getSimStatus(int simId,SimStatusDto& status);
     int setSimStatus(int simId,string status);
+    int getSimMetric(int simId,int step,SimMetricDto& ret);
     int setSimStepAndTime(int simId,int step,int currentTime);
     int createSim(int simId,int groupId,string name,string routeAlg,string scheduleAlg);
     int clear();

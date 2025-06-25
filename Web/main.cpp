@@ -5,6 +5,7 @@
 #include "Web/AppComponent.hpp"
 #include "Web/WorkerComponent.hpp"
 
+#include "Alg/DistributedIDGenerator.h"
 #include "oatpp/network/Server.hpp"
 
 #include <iostream>
@@ -85,9 +86,11 @@ int main(int argc, const char * argv[]) {
     std::string role = argv[1];
 
     if (role == "master") {
+        DistributedIDGenerator::next_id(0);
         ConfigReader::setStr("role","master");
         runMaster();
     } else if (role == "worker") {
+        DistributedIDGenerator::next_id(1);
         ConfigReader::setStr("role","worker");
         runWorker();
     } else {

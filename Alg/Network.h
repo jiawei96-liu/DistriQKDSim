@@ -74,6 +74,7 @@ public:
 
     void Clear();
 
+    SimMetric getCurrentMetric();
     void StoreSimRes();
     void StoreSimResInDb();
     void beforeStore();
