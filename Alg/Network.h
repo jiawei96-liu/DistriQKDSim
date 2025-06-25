@@ -73,11 +73,13 @@ public:
     bool KeyRateShortestPathWithBinHeap(NODEID sourceId, NODEID sinkId, list<NODEID>& nodeList, list<LINKID>& linkList) ; //用二叉堆优化的keyrate最短路算法，返回经过的节点和链路列表
     void ShowDemandPaths(); //查看并输出所有demand的路径信息（节点信息）
     //function for scheduling
-    std::function<TIME(NODEID, map<DEMANDID, VOLUME>&)> currentScheduleAlg;
+    // std::function<TIME(NODEID, map<DEMANDID, VOLUME>&)> currentScheduleAlg;
+    std::function<TIME(LINKID, map<DEMANDID, VOLUME>&)> currentScheduleAlg;
     TIME MinimumRemainingTimeFirst(NODEID nodeId, map<DEMANDID, VOLUME>& relayDemands); // 计算给定节点的需求转发执行时间
     TIME AverageKeyScheduling(NODEID nodeId, map<DEMANDID, VOLUME>& relayDemands); // 计算给定节点的需求转发执行时间
     //link based基于链路
     TIME MinimumRemainingTimeFirstLinkBased(LINKID linkId, map<DEMANDID, VOLUME> &relayDemands);
+    TIME AverageKeySchedulingLinkBased(LINKID linkId, map<DEMANDID, VOLUME> &relayDemands);
     TIME FindDemandToRelayLinkBased(map<NODEID, map<DEMANDID, VOLUME>> &relayDemand);
 
 
@@ -127,6 +129,13 @@ public:
     }
     void setKeyRateShortestPathWithBinHeap(){
         m_routeStrategy=std::move(m_routeFactory->CreateStrategy(route::RouteType_KeyRateShortestPath));
+        // currentRouteAlg = [this](NODEID sourceId, NODEID sinkId, list<NODEID>& nodeList, list<LINKID>& linkList) -> bool
+        // {
+        //     return this->KeyRateShortestPathWithBinHeap(sourceId, sinkId, nodeList, linkList);
+        // };
+    }
+    void setdemoRoute(){
+        m_routeStrategy=std::move(m_routeFactory->CreateStrategy(route::RouteType_demo));
         // currentRouteAlg = [this](NODEID sourceId, NODEID sinkId, list<NODEID>& nodeList, list<LINKID>& linkList) -> bool
         // {
         //     return this->KeyRateShortestPathWithBinHeap(sourceId, sinkId, nodeList, linkList);

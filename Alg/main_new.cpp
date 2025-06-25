@@ -21,14 +21,16 @@ int main() {
     sim.QKDSim::loadCSV("/home/ustc-int/Desktop/wyy/DistriQKDSim/DistriQKDSim/Input/demand(10000).csv", Demand);
     sim.readCSV(Demand);
 
-    // 统计 InitRelayPath 函数的执行时间
+    // 统计 InitRelayPath 函数的执行时间-
     auto start = std::chrono::high_resolution_clock::now();
     // network.InitRelayPath();
+
+    
 
     // 设置最大线程数
     size_t max_threads = 50;
     network.InitRelayPath(max_threads); // 调用并行化的 InitRelayPath()
-    
+    network.InitLinkDemand();
     auto end_1 = std::chrono::high_resolution_clock::now();
 
     std::chrono::duration<double> elapsed_1 = end_1 - start;

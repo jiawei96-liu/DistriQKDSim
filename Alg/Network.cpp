@@ -6,7 +6,7 @@
 #include <thread>
 #include <vector>
 #include <algorithm> // for std::min
-
+#include <chrono> // 高精度时间
 
 CNetwork::CNetwork(void)
 {
@@ -21,11 +21,18 @@ CNetwork::CNetwork(void)
 
     // m_routeStrategy=std::move(m_routeFactory->CreateStrategy(route::RouteType_Bfs));    //BFS
 
-    m_routeStrategy=std::move(m_routeFactory->CreateStrategy(route::RouteType_KeyRateShortestPath));   //keyrate最短路策略
+    // m_routeStrategy=std::move(m_routeFactory->CreateStrategy(route::RouteType_KeyRateShortestPath));   //keyrate最短路策略
 
-    currentScheduleAlg = [this](NODEID nodeId, map<DEMANDID, VOLUME>& relayDemands) -> TIME
+    m_routeStrategy=std::move(m_routeFactory->CreateStrategy(route::RouteType_demo));   //自定义路由算法
+
+    // currentScheduleAlg = [this](NODEID nodeId, map<DEMANDID, VOLUME>& relayDemands) -> TIME
+    // {
+    //     return this->MinimumRemainingTimeFirst(nodeId, relayDemands);
+    // };
+    currentScheduleAlg = [this](LINKID linkId, map<DEMANDID, VOLUME>& relayDemands) -> TIME
     {
-        return this->MinimumRemainingTimeFirst(nodeId, relayDemands);
+        // return this->MinimumRemainingTimeFirstLinkBased(linkId, relayDemands);
+        return this->AverageKeySchedulingLinkBased(linkId, relayDemands);
     };
 }
 
@@ -1150,36 +1157,209 @@ TIME CNetwork::AverageKeyScheduling(NODEID nodeId, map<DEMANDID, VOLUME> &relayD
     return executeTime;
 }
 
-// 为指定节点 nodeId 找到需要转发的需求，并计算所需时间
-TIME CNetwork::FindDemandToRelay(NODEID nodeId, map<DEMANDID, VOLUME> &relayDemand)
+TIME CNetwork::AverageKeySchedulingLinkBased(LINKID linkId, map<DEMANDID, VOLUME> &relayDemands)
 {
-    return currentScheduleAlg(nodeId, relayDemand);
+    TIME executeTime = INF;                // 表示当前的最小执行时间
+    // 创建一个随机数引擎
+    std::random_device rd;  // 用于获取随机种子
+    // auto seed = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+    std::mt19937 gen(rd()); // 使用 Mersenne Twister 算法生成随机数
+    std::uniform_real_distribution<double> dis(0.0, 1.0); // 生成 0.0 到 1.0 之间的随机小数
+
+    // 生成随机数
+
+    double tempWait = dis(gen);
+    // cout<<"tempWait"<<tempWait<<endl;
+    // 跳过故障link和link上没需求的link
+    if (m_vAllLinks[linkId].GetFaultTime() > 0 && m_vAllLinks[linkId].GetFaultTime() <= m_dSimTime || m_vAllLinks[linkId].m_lCarriedDemands.empty())
+    {
+        m_vAllLinks[linkId].wait_or_not = true;
+        relayDemands.clear();
+        return executeTime;
+    }
+    
+    VOLUME availableKeyVolume = m_vAllLinks[linkId].GetAvaialbeKeys();
+    RATE bandwidth = m_vAllLinks[linkId].GetBandwidth();
+    NODEID sourceid =  m_vAllLinks[linkId].GetSourceId();
+    NODEID sinkid =  m_vAllLinks[linkId].GetSinkId();
+    TIME tempTime = INF;
+    int num_of_demand = 0;
+    // 遍历link上的demand，得到一条链路上的执行时间
+    set<NODEID> node_set;
+    for (auto &demandid : m_vAllLinks[linkId].m_lCarriedDemands)
+    {
+        
+        if (m_vAllDemands[demandid].GetArriveTime() > m_dSimTime + SMALLNUM)
+        {
+            // this demand has not arrived yet
+            continue;
+        }
+        num_of_demand++;
+        // cout<< m_vAllLinks[linkId].GetLinkId()<< "have demand" << demandid<<endl;
+        NODEID nodeid;
+        VOLUME relayVolume;
+        auto &nextNode = m_vAllDemands[demandid].m_Path.m_mNextNode;
+        // relayVolume就是找到的待传的数据，这个m_mRelayVolume在sourceid或sinkid上
+        if (nextNode.count(sourceid) && nextNode[sourceid] == sinkid)
+        {
+            nodeid = sourceid;
+            relayVolume = m_vAllNodes[nodeid].m_mRelayVolume[demandid];
+            if (node_set.find(nodeid) == node_set.end()) {
+                node_set.insert(nodeid); // 不存在则插入
+            }
+        }
+        else if (nextNode.count(sinkid) && nextNode[sinkid] == sourceid)
+        {
+            nodeid = sinkid;
+            relayVolume = m_vAllNodes[nodeid].m_mRelayVolume[demandid];
+            if (node_set.find(nodeid) == node_set.end()) {
+                node_set.insert(nodeid); // 不存在则插入
+            }
+        }
+        // else
+        // {
+        //     throw 1;
+        // }
+
+        // 对一个demand，判断链路最小执行时间tempTime
+        if (relayVolume)
+        {
+            if (relayVolume / bandwidth < tempTime)
+            {
+                tempTime = relayVolume / bandwidth;
+            }
+        }
+        // cout << "relayVolume" << relayVolume<<endl;
+        // cout << "bandwidth" << bandwidth<<endl;
+        // cout << "tempTime" << tempTime<<endl;
+    }
+    // 没有可以传的需求
+    // if (num_of_demand == 0)
+    // {
+    //     continue;
+    // }
+    // 找到了该条链路上的最小执行时间tempTime，计算最小传输量，然后比较可用密钥量
+    // VOLUME needVolume = tempTime * bandwidth * link.m_lCarriedDemands.size();
+    // if (tempTime < 1)
+    // {
+    //     if (tempWait < 0.95)
+    //     {
+    //         m_vAllLinks[linkId].wait_or_not = true;
+    //         relayDemands.clear();
+    //         return 3;
+    //     }
+    // }
+    VOLUME needVolume = tempTime * bandwidth * num_of_demand;
+    // cout << "needVolume" << needVolume<<endl;
+    // cout << "availableKeyVolume" << availableKeyVolume<<endl;
+    // 如果可用密钥量足够，给每一个nodeid，赋值传同样的最小传输量
+    if (needVolume <= availableKeyVolume)
+    {
+        m_vAllLinks[linkId].wait_or_not = false;
+        for (auto &demandid : m_vAllLinks[linkId].m_lCarriedDemands)
+        {
+            // 对每一个可以传输的demand，给相应的nodeid传输最小传输量
+            relayDemands[demandid] = tempTime * bandwidth;
+        }
+        // if (tempWait < 0.9)
+        // {
+        //     m_vAllLinks[linkId].wait_or_not = true;
+        //     relayDemands.clear();
+        //     return 3;
+        // }
+    }
+    // else if (availableKeyVolume >= 10)
+    // {
+    //     link.wait_or_not = false;
+    //     for (auto &demandid : link.m_lCarriedDemands)
+    //     {
+    //         NODEID nodeid;
+    //         auto &nextNode = m_vAllDemands[demandid].m_Path.m_mNextNode;
+    //         // relayVolume就是找到的待传的数据，这个m_mRelayVolume在sourceid或sinkid上
+    //         if (nextNode.count(sourceid) && nextNode[sourceid] == sinkid)
+    //         {
+    //             nodeid = sourceid;
+    //         }
+    //         else if (nextNode.count(sinkid) && nextNode[sinkid] == sourceid)
+    //         {
+    //             nodeid = sinkid;
+    //         }
+    //         // else
+    //         // {
+    //         //     throw 1;
+    //         // }
+    //         // 对每一个可以传输的demand，给相应的nodeid传输最小传输量
+    //         if (nodeid == nodeId)
+    //         {
+    //             // relayDemands[demandid] = availableKeyVolume / link.m_lCarriedDemands.size();
+    //             relayDemands[demandid] = availableKeyVolume / num_of_demand;
+    //         }
+    //     }
+    // }
+    else
+    {
+        m_vAllLinks[linkId].wait_or_not = true;
+        relayDemands.clear();
+        return 3;
+        // tempTime = (needVolume - availableKeyVolume) / m_vAllLinks[linkId].GetQKDRate();
+    }
+    if (tempTime < executeTime)
+    {
+        executeTime = tempTime;
+    }
+    
+    return executeTime;
+}
+
+
+// 为指定节点 nodeId 找到需要转发的需求，并计算所需时间
+// TIME CNetwork::FindDemandToRelay(NODEID nodeId, map<DEMANDID, VOLUME> &relayDemand)
+// {
+//     return currentScheduleAlg(nodeId, relayDemand);
+// }
+
+TIME CNetwork::FindDemandToRelay(LINKID linkId, map<DEMANDID, VOLUME> &relayDemand)
+{
+    return currentScheduleAlg(linkId, relayDemand);
 }
 
 // 为所有节点找到需要转发的需求，并计算执行时间
 TIME CNetwork::FindDemandToRelayLinkBased(map<NODEID, map<DEMANDID, VOLUME>> &relayDemand)
 {
     map<NODEID, map<DEMANDID, VOLUME>> nodeRelayDemand; // 表示对应NODEID在nodeRelayTime时间中，每个需求发送的数据量
-    map<LINKID, map<DEMANDID, VOLUME>> linkRelayDemand; // 表示对应NODEID在nodeRelayTime时间中，每个需求发送的数据量
+    map<LINKID, map<DEMANDID, VOLUME>> linkRelayDemand; // 表示对应LINKID在linkRelayTime时间中，每个需求发送的数据量
     map<NODEID, TIME> nodeRelayTime;                    // NODEID节点上的需求执行一跳的最短时间
     map<LINKID, TIME> linkRelayTime;
     TIME minExecuteTime = INF;
-    // 遍历所有链路 (nodeId)，对每个节点调用 FindDemandToRelay，计算该节点的需求转发时间和需要转发的需求量 tempRelayDemand
+    // 遍历所有链路 (linkId)，对每个链路调用 FindDemandToRelay，计算该链路的需求转发时间和需要转发的需求量 tempRelayDemand
     for (LINKID linkId = 0; linkId < m_uiLinkNum; linkId++)
     {
         map<DEMANDID, VOLUME> tempRelayDemand;
         TIME executeTime = FindDemandToRelay(linkId, tempRelayDemand);
         // 将每个节点的最小转发时间存储在 nodeRelayTime 中，并更新 minExecuteTime 以记录全网络的最小转发时间
+        if (m_vAllLinks[linkId].wait_or_not == true)
+        {
+            continue;
+        }
+        
         linkRelayTime[linkId] = executeTime;
         if (executeTime < minExecuteTime)
         {
             minExecuteTime = executeTime;
         }
-        linkRelayTime[linkId] = executeTime;
+        // linkRelayTime[linkId] = executeTime;
         // 将每个节点的转发需求量存储在 nodeRelayDemand 中
         linkRelayDemand[linkId] = tempRelayDemand;
     }
-
+    if (minExecuteTime == INF)
+    {
+        minExecuteTime = 3;
+    }
+    if (minExecuteTime < 3)
+    {
+        minExecuteTime = 3;
+        relayDemand.clear();
+    }
     cout << "minExecuteTime: " << minExecuteTime << endl;
 
     // 判断是否在当前最小转发时间 minExecuteTime 内有新的需求到达。如果是，则将 minExecuteTime 更新为下一个需求到达时间与当前模拟时间的差值
@@ -1201,58 +1381,68 @@ TIME CNetwork::FindDemandToRelayLinkBased(map<NODEID, map<DEMANDID, VOLUME>> &re
             NODEID SourceId = m_vAllLinks[linkId].GetSourceId();
             NODEID SinkId = m_vAllLinks[linkId].GetSinkId();
             map<DEMANDID, VOLUME>::iterator demandIter;
-            
+            // 确定这个需求是从哪个端点传到哪边。
             int succ_signal = 0;
             for (auto demandIter = m_vAllNodes[SourceId].m_mRelayVolume.begin(); demandIter != m_vAllNodes[SourceId].m_mRelayVolume.end(); demandIter++)
             {
                 if (demandIter->first == demand_id)
                 {
-                    if (nodeRelayDemand.find(SourceId) == nodeRelayDemand.end())
-                    {
-                        nodeRelayDemand[SourceId] = linkIter->second;
-                        nodeRelayTime[SourceId] = linkRelayTime[linkId];
-                        succ_signal = 1;
-                        break;
-                    }
-                    else
-                    {
-                        map<DEMANDID, VOLUME>& demand_map_temp = nodeRelayDemand[SourceId];
-                        for (const auto& pair_temp : demand_map_temp)
-                        {
-                            if(pair.second < pair_temp.second)
-                            {
-                                nodeRelayDemand[SourceId] = linkIter->second;
-                                nodeRelayTime[SourceId] = linkRelayTime[linkId];
-                                succ_signal = 1;
-                                break;
-                            }
-                        }
-                    }
+                    nodeRelayDemand[SourceId][demand_id] = pair.second;
+                    // // 这个传输时间是为了后面调整传输比例
+                    nodeRelayTime[SourceId] = linkRelayTime[linkId];
+                    succ_signal = 1;
+                    break;
+                    // // 找到这个节点，假如没找到这个节点
+                    // if (nodeRelayDemand.find(SourceId) == nodeRelayDemand.end())
+                    // {
+                    //     nodeRelayDemand[SourceId][demand_id] = pair.second;
+                    //     // nodeRelayDemand[SourceId] = linkIter->second;
+                    //     // // 这个传输时间是为了后面调整传输比例
+                    //     nodeRelayTime[SourceId] = linkRelayTime[linkId];
+                    //     succ_signal = 1;
+                    //     break;
+                    // }
+                    // // 找到了这个节点，说明这个节点已经有要传输的需求，那么选择较小的需求传输
+                    // else
+                    // {
+                    //     map<DEMANDID, VOLUME>& demand_map_temp = nodeRelayDemand[SourceId];
+                    //     for (const auto& pair_temp : demand_map_temp)
+                    //     {
+                    //         if(pair.second < pair_temp.second)
+                    //         {
+                    //             nodeRelayDemand[SourceId] = linkIter->second;
+                    //             nodeRelayTime[SourceId] = linkRelayTime[linkId];
+                    //             succ_signal = 1;
+                    //             break;
+                    //         }
+                    //     }
+                    // }
                 }
             }
             if (succ_signal != 1)
             {
                 if (nodeRelayDemand.find(SinkId) == nodeRelayDemand.end())
                 {
-                    nodeRelayDemand[SinkId] = linkIter->second;
+                    nodeRelayDemand[SinkId][demand_id] = pair.second;
+                    // nodeRelayDemand[SinkId] = linkIter->second;
                     nodeRelayTime[SinkId] = linkRelayTime[linkId];
-                    succ_signal = 1;
+                    // succ_signal = 1;
                     break;
                 }
-                else
-                {
-                    map<DEMANDID, VOLUME>& demand_map_temp = nodeRelayDemand[SinkId];
-                    for (const auto& pair_temp : demand_map_temp)
-                    {
-                        if(pair.second < pair_temp.second)
-                        {
-                            nodeRelayDemand[SinkId] = linkIter->second;
-                            nodeRelayTime[SinkId] = linkRelayTime[linkId];
-                            succ_signal = 1;
-                            break;
-                        }
-                    }
-                }
+                // else
+                // {
+                //     map<DEMANDID, VOLUME>& demand_map_temp = nodeRelayDemand[SinkId];
+                //     for (const auto& pair_temp : demand_map_temp)
+                //     {
+                //         if(pair.second < pair_temp.second)
+                //         {
+                //             nodeRelayDemand[SinkId] = linkIter->second;
+                //             nodeRelayTime[SinkId] = linkRelayTime[linkId];
+                //             // succ_signal = 1;
+                //             break;
+                //         }
+                //     }
+                // }
             }
         }
     }
@@ -1357,11 +1547,11 @@ void CNetwork::RelayForOneHop(TIME executeTime, map<NODEID, map<DEMANDID, VOLUME
                 m_vAllLinks[minLink].ConsumeKeys(demandIter->second);
                 // 从当前节点上移除已经转发的需求数据量 (demandIter->second)。如果当前节点是该需求的源节点，调用 ReduceVolume 减少需求的剩余数据量
                 // ？？仅在需求在源节点被传输后，才减少数据量，中间节点没有这个操作，不知道是否符合逻辑
-                cout << "demandIter->second" << demandIter->second << endl;
+                // cout << "demandIter->second" << demandIter->second << endl;
                 if (nodeIter->first == m_vAllDemands[demandIter->first].GetSourceId())
                 {
-                    cout << "nodeIter->first" << nodeIter->first << endl;
-                    cout << "m_vAllDemands[demandIter->first].GetSourceId()" << m_vAllDemands[demandIter->first].GetSourceId() << endl;
+                    // cout << "nodeIter->first" << nodeIter->first << endl;
+                    // cout << "m_vAllDemands[demandIter->first].GetSourceId()" << m_vAllDemands[demandIter->first].GetSourceId() << endl;
                     m_vAllDemands[demandIter->first].ReduceVolume(demandIter->second);
                 }
 
@@ -1397,8 +1587,8 @@ void CNetwork::RelayForOneHop(TIME executeTime, map<NODEID, map<DEMANDID, VOLUME
                     if (m_vAllLinks[nextMinLink].m_lCarriedDemands.find(demandIter->first) == m_vAllLinks[nextMinLink].m_lCarriedDemands.end())
                     {
                         m_vAllLinks[nextMinLink].m_lCarriedDemands.insert(demandIter->first);
-                        cout<< "--------------------------------------------------------" <<endl;
-                        cout<< m_vAllLinks[nextMinLink].GetLinkId() << "insert" << demandIter->first << endl;
+                        // cout<< "--------------------------------------------------------" <<endl;
+                        // cout<< m_vAllLinks[nextMinLink].GetLinkId() << "insert" << demandIter->first << endl;
                     }
                 }
             }
@@ -1482,7 +1672,8 @@ TIME CNetwork::OneTimeRelay()
     CheckFault();
     // std::cout << "Current Time after checkfault: " << m_dSimTime << std::endl;
     // std::cout << "Current FaultTime after checkfault: " << FaultTime << std::endl;
-    TIME executeTime = FindDemandToRelay(nodeRelay);
+    // TIME executeTime = FindDemandToRelay(nodeRelay);
+    TIME executeTime = FindDemandToRelayLinkBased(nodeRelay);
     RelayForOneHop(executeTime, nodeRelay);
     return executeTime;
 }

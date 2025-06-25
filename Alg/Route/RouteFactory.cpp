@@ -3,8 +3,11 @@
 #include "KeyRateStrategy.h"
 #include "BidBfsStrategy.h"
 #include "KeyRateFibStrategy.h"
+#include "demoRoute.h"
 #include "Alg/Network.h"
 #include <iostream>
+
+// #include "YourStrategy.h" //自定义路由函数文件
 
 using namespace route ;
 
@@ -27,6 +30,10 @@ std::unique_ptr<RouteStrategy> RouteFactory::CreateStrategy(RouteStrategyType ty
         return std::make_unique<KeyRateStrategy>(net);  //二叉堆
         
         // return std::make_unique<KeyRateFibStrategy>(net);    //斐波那契堆
+    }else if(type==RouteType_demo){
+        cout << "自定义路由算法" << endl;
+        return std::make_unique<BfsStrategy>(net);  //自定义路由算法1
+    
     }else {
         std::cerr << "Unknown strategy type: " << type << std::endl;
     }
