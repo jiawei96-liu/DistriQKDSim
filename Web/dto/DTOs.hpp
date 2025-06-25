@@ -71,12 +71,61 @@ class SimResDto: public oatpp::DTO{
 class SimStatusDto: public oatpp::DTO{
     DTO_INIT(SimStatusDto,DTO)
 
+    DTO_FIELD(Int32,id);    
     DTO_FIELD(String,name);
+    DTO_FIELD(String,createTime);
     DTO_FIELD(String,status);
     DTO_FIELD(String,routeAlg);
     DTO_FIELD(String,scheduleAlg);
     DTO_FIELD(UInt32,currentStep);
     DTO_FIELD(Float64,currentTime);
+
+    SimStatusDto()=default;
+    SimStatusDto(const SimStatusDto& that){
+        id=that.id;
+        name=that.name;
+        createTime=that.createTime;
+        status=that.status;
+        routeAlg=that.routeAlg;
+        scheduleAlg=that.scheduleAlg;
+        currentStep=that.currentStep;
+        currentTime=that.currentTime;
+    }
+};
+
+class CodeDto : public oatpp::DTO {
+    DTO_INIT(CodeDto, DTO)
+
+    DTO_FIELD(String, name);
+    DTO_FIELD(String, code);
+};
+
+class SimMetricDto: public oatpp::DTO{
+    DTO_INIT(SimMetricDto,DTO)
+
+    DTO_FIELD(Int32,stepId);    
+    DTO_FIELD(Int32,simId);    
+    DTO_FIELD(Int32,step);  
+    DTO_FIELD(Float64,currentTime);
+
+    DTO_FIELD(Float64,transferredVolume);
+    DTO_FIELD(Float64,transferredPercent);
+    DTO_FIELD(Float64,remainingVolume);
+    DTO_FIELD(Float64,transferRate);
+    DTO_FIELD(Float64,inProgressDemandCount);
+
+    SimMetricDto()=default;
+    SimMetricDto(const SimMetricDto& that){
+        stepId=that.stepId;
+        simId=that.simId;
+        step=that.step;
+        currentTime=that.currentTime;
+        transferredVolume=that.transferredVolume;
+        transferredPercent=that.transferredPercent;
+        remainingVolume=that.remainingVolume;
+        transferRate=that.transferRate;
+        inProgressDemandCount=that.inProgressDemandCount;
+    }
 };
 
 #include OATPP_CODEGEN_END(DTO)

@@ -33,3 +33,14 @@ public:
 
 
 
+class SimMetric
+{
+public:
+    int step = 0;
+    double CurrentTime = 0.0;
+    double TransferredVolume = 0.0;
+    double TransferredPercent = 0.0;
+    double RemainingVolume = 0.0;
+    double TransferRate = 0.0;
+    int InProgressDemandCount = 0;
+};

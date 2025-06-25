@@ -36,7 +36,7 @@ int main() {
     std::chrono::duration<double> elapsed_1 = end_1 - start;
     std::cout << "路径初始化耗时: " << elapsed_1.count() << " s." << std::endl;
 
-    network.InitLinkDemand();
+    network.InitLinkDemand(); 
 
     network.ShowDemandPaths();
     while (!network.AllDemandsDelivered())

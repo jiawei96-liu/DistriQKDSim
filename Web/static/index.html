@@ -74,7 +74,10 @@
                         <a class="nav-link" href="/sim.html" id="simulationResultLink">仿真结果</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#" id="relayPathLink">中继路径</a>
+                        <a class="nav-link" href="/routeCode.html" id="relayPathLink">路由策略</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/history.html" id="relayPathLink">历史仿真</a>
                     </li>
                 </ul>
             </div>
@@ -272,7 +275,7 @@
         let schedulingAlgorithmParam = (schedulingAlgorithm === 'minRemainingTime') ? 0 : 1;
 
         // 构造请求 URL，使用查询参数传递数据
-        const url = `${apiBaseUrl}/sim/start?routingAlgorithm=${routingAlgorithmParam}&schedulingAlgorithm=${schedulingAlgorithmParam}`;
+        const url = `${apiBaseUrl}/sim/allStart?routingAlgorithm=${routingAlgorithmParam}&schedulingAlgorithm=${schedulingAlgorithmParam}`;
 
         try {
             // 发起POST请求（使用POST方法，通过查询参数传递）

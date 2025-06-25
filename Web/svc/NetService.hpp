@@ -16,7 +16,6 @@ private:
 
     vector<CNetwork*> networks;
     vector<QKDSim*> sims;
-    SimDao simDao;
     int groupId;
 
     // 私有构造函数，确保不能外部创建实例
@@ -32,6 +31,8 @@ private:
     }
 
 public:
+    SimDao simDao;
+
     // 禁止复制和赋值
     NetService(const NetService&) = delete;
     NetService& operator=(const NetService&) = delete;
@@ -66,8 +67,12 @@ public:
 
     oatpp::Object<ListDto<oatpp::Object<SimResDto>>> getSimResByStep(int route,int sched,int step);
 
-    oatpp::Object<SimStatusDto> getSimStatus(int route,int sched);
-    oatpp::Object<SimResStatusDto> getSimResStatusByStep(int route,int sched,int step);
+    oatpp::Object<SimStatusDto> getSimStatus(int route,int sched,int simID=0);
+    oatpp::Object<SimResStatusDto> getSimResStatusByStep(int route,int sched,int step,int simId=0);
+    oatpp::Object<SimMetricDto> getSimMetric(int route,int sched,int step,int simId=0);
+
+    oatpp::Object<ListDto<oatpp::Object<SimStatusDto>>> getHistorySims();
+    int deleteSimById(int simId);
 
     void begin(bool on,int routeAlg,int scheduleAlg);
 
@@ -76,7 +81,8 @@ public:
 
     void Clear();
 
-    bool start(int routeAlg,int scheduleAlg);
+    //返回simID，为0则异常
+    int start(int routeAlg,int scheduleAlg);
 
     bool allStart();
 };

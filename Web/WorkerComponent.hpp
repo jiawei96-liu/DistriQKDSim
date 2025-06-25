@@ -1,5 +1,5 @@
-#ifndef AppComponent_hpp
-#define AppComponent_hpp
+#ifndef WorkerComponent_hpp
+#define WorkerComponent_hpp
 
 #include "oatpp/web/server/HttpConnectionHandler.hpp"
 
@@ -14,14 +14,14 @@
  *  Class which creates and holds Application components and registers components in oatpp::base::Environment
  *  Order of components initialization is from top to bottom
  */
-class AppComponent {
+class WorkerComponent {
 public:
   
   /**
    *  Create ConnectionProvider component which listens on the port
    */
   OATPP_CREATE_COMPONENT(std::shared_ptr<oatpp::network::ServerConnectionProvider>, serverConnectionProvider)([] {
-    return oatpp::network::tcp::server::ConnectionProvider::createShared({ConfigReader::getStr("master"), ConfigReader::getInt("master_port"), oatpp::network::Address::IP_4});
+    return oatpp::network::tcp::server::ConnectionProvider::createShared({ConfigReader::getStr("worker"), ConfigReader::getInt("worker_port"), oatpp::network::Address::IP_4});
   }());
   
   /**
@@ -46,9 +46,6 @@ public:
     return oatpp::parser::json::mapping::ObjectMapper::createShared();
   }());
 
-  OATPP_CREATE_COMPONENT(std::shared_ptr<StaticFilesManager>, staticFilesManager)([] {
-    return std::make_shared<StaticFilesManager>("./" /* path to '<this-repo>/Media-Stream/video' folder. Put full, absolute path here */) ;
-  }());
 
 };
 

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "stdafx.h"
 #include "Node.h"
 #include "Link.h"
@@ -18,23 +18,23 @@ public:
     CNetwork(void);
     ~CNetwork(void);
     //data structure for input
-    vector<CNode> m_vAllNodes;	// 存储网络中所有节点的列表
-    vector<CLink> m_vAllLinks;	// 存储网络中所有链路的列表
-    vector<CDemand> m_vAllDemands;	// 存储网络中所有需求的列表
-    vector<CRelayPath> m_vAllRelayPaths;	// 存储网络中所有中继路径的列表
-    map<pair<NODEID, NODEID>, LINKID> m_mNodePairToLink;	// 用于根据节点对查找对应链路的映射表
-    vector<CNetEvent> m_vAllExistingEvent;	// 存储网络中的所有事件   保留，未使用
+    vector<CNode> m_vAllNodes;	// �洢���������нڵ���б�
+    vector<CLink> m_vAllLinks;	// �洢������������·���б�
+    vector<CDemand> m_vAllDemands;	// �洢����������������б�
+    vector<CRelayPath> m_vAllRelayPaths;	// �洢�����������м�·�����б�
+    map<pair<NODEID, NODEID>, LINKID> m_mNodePairToLink;	// ���ڸ��ݽڵ�Բ��Ҷ�Ӧ��·��ӳ���
+    vector<CNetEvent> m_vAllExistingEvent;	// �洢�����е������¼�   ������δʹ��
 
     //data structure for simulation
-    multimap<TIME, EVENTID> m_mUncompltedEvent;	// 存储未完成事件的时间和事件ID的映射表  保留，未使用
+    multimap<TIME, EVENTID> m_mUncompltedEvent;	// �洢δ����¼���ʱ����¼�ID��ӳ���  ������δʹ��
 
-//    vector<CKeyManager> m_vAllKeyManager;	// 存储网络中所有密钥管理器的列表
+//    vector<CKeyManager> m_vAllKeyManager;	// �洢������������Կ���������б�
 
-    multimap<TIME, DEMANDID> m_mDemandArriveTime;	// 存储需求到达时间和需求ID的映射表    有序
+    multimap<TIME, DEMANDID> m_mDemandArriveTime;	// �洢���󵽴�ʱ�������ID��ӳ���    ����
 
-    TIME FaultTime;  //表示当前故障发生的时间
-    // vector<CLink> failedLink; //存储当前时隙故障的link
-    list<LINKID> failedLink; //存储当前时隙故障的linkID
+    TIME FaultTime;  //��ʾ��ǰ���Ϸ�����ʱ��
+    // vector<CLink> failedLink; //�洢��ǰʱ϶���ϵ�link
+    list<LINKID> failedLink; //�洢��ǰʱ϶���ϵ�linkID
 
     uint32_t simID;
     string status;
@@ -43,13 +43,13 @@ public:
 
 
 private:
-    UINT m_uiNodeNum;	// 网络中的节点数量
-    UINT m_uiLinkNum;	// 网络中的链路数量
-    UINT m_uiDemandNum;	// 网络中的需求数量
-    TIME m_dSimTime;	// 当前模拟时间
-    UINT m_step;        // 执行步数
-    std::unique_ptr<route::RouteFactory> m_routeFactory;    //路由策略工厂
-    std::unique_ptr<route::RouteStrategy> m_routeStrategy;  //当前路由策略
+    UINT m_uiNodeNum;	// �����еĽڵ�����
+    UINT m_uiLinkNum;	// �����е���·����
+    UINT m_uiDemandNum;	// �����е���������
+    TIME m_dSimTime;	// ��ǰģ��ʱ��
+    UINT m_step;        // ִ�в���
+    std::unique_ptr<route::RouteFactory> m_routeFactory;    //·�ɲ��Թ���
+    std::unique_ptr<route::RouteStrategy> m_routeStrategy;  //��ǰ·�ɲ���
     SimResultStore simResStore;
     SimDao simDao;
 
@@ -64,16 +64,17 @@ public:
     void SetDemandNum(UINT demandNum);
     UINT GetDemandNum();
 
-    TIME CurrentTime();	// 获取当前模拟时间
+    TIME CurrentTime();	// ��ȡ��ǰģ��ʱ��
     UINT CurrentStep();
-    void MoveSimTime(TIME executeTime);	// 推进模拟时间并处理相应的事件
+    void MoveSimTime(TIME executeTime);	// �ƽ�ģ��ʱ�䲢������Ӧ���¼�
 
-    void InitKeyManagerOverLink(LINKID linkId);	// 为特定链路初始化密钥管理器
+    void InitKeyManagerOverLink(LINKID linkId);	// Ϊ�ض���·��ʼ����Կ������
 
     void InitNodes(UINT nodeNum);
 
     void Clear();
 
+    SimMetric getCurrentMetric();
     void StoreSimRes();
     void StoreSimResInDb();
     void beforeStore();
@@ -83,51 +84,51 @@ public:
 
     //common route algorithms
     std::function<bool(NODEID, NODEID, list<NODEID>&, list<LINKID>&)> currentRouteAlg;
-    bool ShortestPath(NODEID sourceId, NODEID sinkId, list<NODEID>& nodeList, list<LINKID>& linkList);	// 用于计算从源节点到汇节点的最短路径，返回经过的节点和链路列表
-    bool Load_Balance(NODEID sourceId, NODEID sinkId, list<NODEID>& nodeList, list<LINKID>& linkList);  // 负载均衡路由算法
-    bool KeyRateShortestPath(NODEID sourceId, NODEID sinkId, list<NODEID>& nodeList, list<LINKID>& linkList);  // 权重为keyrate的最短路算法，返回经过的节点和链路列表
-    bool KeyRateShortestPathWithBinHeap(NODEID sourceId, NODEID sinkId, list<NODEID>& nodeList, list<LINKID>& linkList) ; //用二叉堆优化的keyrate最短路算法，返回经过的节点和链路列表
-    void ShowDemandPaths(); //查看并输出所有demand的路径信息（节点信息）
+    bool ShortestPath(NODEID sourceId, NODEID sinkId, list<NODEID>& nodeList, list<LINKID>& linkList);	// ���ڼ����Դ�ڵ㵽��ڵ�����·�������ؾ����Ľڵ����·�б�
+    bool Load_Balance(NODEID sourceId, NODEID sinkId, list<NODEID>& nodeList, list<LINKID>& linkList);  // ���ؾ���·���㷨
+    bool KeyRateShortestPath(NODEID sourceId, NODEID sinkId, list<NODEID>& nodeList, list<LINKID>& linkList);  // Ȩ��Ϊkeyrate�����·�㷨�����ؾ����Ľڵ����·�б�
+    bool KeyRateShortestPathWithBinHeap(NODEID sourceId, NODEID sinkId, list<NODEID>& nodeList, list<LINKID>& linkList) ; //�ö�����Ż���keyrate���·�㷨�����ؾ����Ľڵ����·�б�
+    void ShowDemandPaths(); //�鿴���������demand��·����Ϣ���ڵ���Ϣ��
     //function for scheduling
     std::function<TIME(NODEID, map<DEMANDID, VOLUME>&)> currentScheduleAlg;
-    TIME MinimumRemainingTimeFirst(NODEID nodeId, map<DEMANDID, VOLUME>& relayDemands); // 计算给定节点的需求转发执行时间
+    TIME MinimumRemainingTimeFirst(NODEID nodeId, map<DEMANDID, VOLUME>& relayDemands); // ��������ڵ������ת��ִ��ʱ��
     // TIME MinimumRemainingTimeFirstLinkBased(LINKID linkId, map<DEMANDID, VOLUME> &relayDemands);
-    TIME AverageKeyScheduling(NODEID nodeId, map<DEMANDID, VOLUME>& relayDemands); // 计算给定节点的需求转发执行时间
-    //link based基于链路
+    TIME AverageKeyScheduling(NODEID nodeId, map<DEMANDID, VOLUME>& relayDemands); // ��������ڵ������ת��ִ��ʱ��
+    //link based������·
     TIME MinimumRemainingTimeFirstLinkBased(LINKID linkId, map<DEMANDID, VOLUME> &relayDemands);
     TIME FindDemandToRelayLinkBased(map<NODEID, map<DEMANDID, VOLUME>> &relayDemand);
 
 
 public:
-    //functions for relay routing	初始化指定需求或所有需求的中继路径
+    //functions for relay routing	��ʼ��ָ�����������������м�·��
     void InitRelayPath(DEMANDID demandId);
-    // void InitRelayPath();//for all demands
+    void InitRelayPath();//for all demands
 
-    void InitRelayPath(size_t max_threads); // 带参数的版本
+    // void InitRelayPath(size_t max_threads); // �������İ汾
 
     void InitLinkDemand();
 
-    // functions for relay rerouting  发生故障时的抗毁（重路由）功能
+    // functions for relay rerouting  ��������ʱ�Ŀ��٣���·�ɣ�����
     // void CheckFault(DEMANDID demandId);
     void CheckFault();
     void ReInitRelayPath(DEMANDID demandId);
     void ReInitRelayPath();//for all demands
     void Rerouting();
 
-    TIME FindDemandToRelay(NODEID nodeId, map<DEMANDID, VOLUME>& relayDemand);	// 确定应转发的需求，并计算所需的时间
+    TIME FindDemandToRelay(NODEID nodeId, map<DEMANDID, VOLUME>& relayDemand);	// ȷ��Ӧת�������󣬲����������ʱ��
     TIME FindDemandToRelay(map<NODEID, map<DEMANDID, VOLUME>>& relayDemand);
     // TIME FindDemandToRelayLinkBased(map<NODEID, map<DEMANDID, VOLUME>> &relayDemand);
-    void RelayForOneHop(TIME executeTime, map<NODEID, map<DEMANDID, VOLUME>>& relayDemands); // 执行一次需求转发操作，中继到下一跳
-    void UpdateRemainingKeys(TIME executionTime);	// 更新链路上剩余的密钥量
-    void UpdateRemainingKeys(TIME executionTime, TIME m_dSimTime);	// 更新链路上剩余的密钥量
-    void SimTimeForward(TIME executionTime);	// 将模拟时间推进指定的执行时间
+    void RelayForOneHop(TIME executeTime, map<NODEID, map<DEMANDID, VOLUME>>& relayDemands); // ִ��һ������ת���������м̵���һ��
+    void UpdateRemainingKeys(TIME executionTime);	// ������·��ʣ�����Կ��
+    void UpdateRemainingKeys(TIME executionTime, TIME m_dSimTime);	// ������·��ʣ�����Կ��
+    void SimTimeForward(TIME executionTime);	// ��ģ��ʱ���ƽ�ָ����ִ��ʱ��
 
     //main process
-    bool AllDemandsDelivered();	// 检查是否所有需求都已完成传输
-    TIME OneTimeRelay();	// 执行一次转发操作，并推进模拟时间
-//    void MainProcess();	// 网络模拟的主流程，负责初始化路径，逐步执行需求转发，直到所有需求完成   废弃
+    bool AllDemandsDelivered();	// ����Ƿ�������������ɴ���
+    TIME OneTimeRelay();	// ִ��һ��ת�����������ƽ�ģ��ʱ��
+//    void MainProcess();	// ����ģ��������̣������ʼ��·������ִ������ת����ֱ�������������   ����
 
-    // 切换算法
+    // �л��㷨
     void setShortestPath()
     {
         m_routeStrategy=std::move(m_routeFactory->CreateStrategy(route::RouteType_Bfs));

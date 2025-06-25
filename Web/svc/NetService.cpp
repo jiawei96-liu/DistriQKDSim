@@ -1,4 +1,10 @@
 #include "Web/svc/NetService.hpp"
+#include "oatpp/web/client/HttpRequestExecutor.hpp"
+#include "oatpp/network/tcp/client/ConnectionProvider.hpp"
+
+#include "oatpp/parser/json/mapping/ObjectMapper.hpp"
+#include "Web/client/ControlClient.hpp"
+
 #include <dirent.h>  // 用于读取目录
 #include <thread>
 
@@ -39,7 +45,7 @@ oatpp::Object<PageDto<oatpp::Object<DemandDto>>> NetService::getPageDemands(uint
     res->items={};
     res->count=(unsigned int)0;
     auto &network=*networks[0];
-    for (uint32_t i=offset;i<min(network.m_vAllLinks.size(),((size_t)offset+(size_t)limit));i++){
+    for (uint32_t i=offset;i<min(network.m_vAllDemands.size(),((size_t)offset+(size_t)limit));i++){
         auto& dem=network.m_vAllDemands[i];
         auto obj=DemandDto::createShared();
         obj->demandId=dem.GetDemandId();
@@ -233,6 +239,7 @@ oatpp::Object<ListDto<oatpp::Object<SimResDto>>> NetService::getSimRes(int route
     return res;
 }
 
+//UnUsed
 oatpp::Object<ListDto<oatpp::Object<SimResDto>>> NetService::getSimResByStep(int route,int sched,int step){
     vector<SimResDto> res;
     TIME currentTime;
@@ -250,21 +257,47 @@ oatpp::Object<ListDto<oatpp::Object<SimResDto>>> NetService::getSimResByStep(int
     return ret;
 }
 
-oatpp::Object<SimStatusDto> NetService::getSimStatus(int route,int sched){
+oatpp::Object<ListDto<oatpp::Object<SimStatusDto>>> NetService::getHistorySims(){
+    vector<SimStatusDto> res;
+    simDao.getAllSims(res);
+
+    auto ret = ListDto<oatpp::Object<SimStatusDto>>::createShared();
+    ret->items={};
+    for(auto& sim:res){
+        auto _sim=SimStatusDto::createShared(sim);
+        ret->items->push_back(_sim);
+    }
+    ret->count=ret->items->size();
+    return ret;    
+}
+
+oatpp::Object<SimStatusDto> NetService::getSimStatus(int route,int sched,int simID){
     auto ret=SimStatusDto::createShared();
-    auto &network=*networks[route*2+sched];
-    int success=simDao.getSimStatus(network.simID,*ret.getPtr());
 
+    if(simID==0){
+        auto &network=*networks[route*2+sched];
+        int success=simDao.getSimStatus(network.simID,*ret.getPtr());
 
+        ret->status=network.status;
+    }else{
+        int success=simDao.getSimStatus(simID,*ret.getPtr());
+    }
+    
 
     return ret;
 }
 
-oatpp::Object<SimResStatusDto> NetService::getSimResStatusByStep(int route,int sched,int step){
+oatpp::Object<SimResStatusDto> NetService::getSimResStatusByStep(int route,int sched,int step,int simId){
+    
     vector<SimResDto> res;
     TIME currentTime;
-    auto &network=*networks[route*2+sched];
-    simDao.getSimRes(network.simID,step,res,currentTime);
+    if(simId==0){
+        auto &network=*networks[route*2+sched];
+        simDao.getSimRes(network.simID,step,res,currentTime);
+    }else{
+        simDao.getSimRes(simId,step,res,currentTime);
+    }
+    
 
     auto ret = SimResStatusDto::createShared();
     ret->items={};
@@ -275,6 +308,22 @@ oatpp::Object<SimResStatusDto> NetService::getSimResStatusByStep(int route,int s
     ret->count=ret->items->size();
     ret->currentTime=currentTime;
     ret->currentStep=step;
+    return ret;
+}
+
+oatpp::Object<SimMetricDto> NetService::getSimMetric(int route,int sched,int step,int simId){
+    
+    SimMetricDto res;
+    TIME currentTime;
+    if(simId==0){
+        auto &network=*networks[route*2+sched];
+        // simDao.getSimRes(network.simID,step,res,currentTime);
+        simDao.getSimMetric(network.simID,step,res);
+    }else{
+        simDao.getSimMetric(simId,step,res);
+    }
+    
+    auto ret=SimMetricDto::createShared(res);
     return ret;
 }
 
@@ -292,9 +341,10 @@ void NetService::next10Step(){
     }
 }
 
-bool NetService::start(int routeAlg,int scheduleAlg){
+int NetService::start(int routeAlg,int scheduleAlg){
 
     auto &network=*networks[routeAlg*2+scheduleAlg];
+    // simDao.clear();
     if(routeAlg==0){
         network.setShortestPath();
     }else if (routeAlg==1)
@@ -311,8 +361,9 @@ bool NetService::start(int routeAlg,int scheduleAlg){
     }else{
         return false;
     }
-    
-    network.InitRelayPath(std::thread::hardware_concurrency());
+    // network.InitRelayPath(std::thread::hardware_concurrency());
+    network.InitRelayPath();
+    network.InitLinkDemand();
     int success=simDao.createSim(network.simID,groupId,"sim-"+to_string(network.simID),to_string(routeAlg),to_string(scheduleAlg));
     if (success!=1)
     {
@@ -323,20 +374,65 @@ bool NetService::start(int routeAlg,int scheduleAlg){
     std::thread backgroundThread(&CNetwork::RunInBackGround, &network);
     backgroundThread.detach();
     
-    return true;
+    return network.simID;
 }
 
 bool NetService::allStart(){
-    for(int routeAlg=0;routeAlg<2;routeAlg++){
+    if(ConfigReader::getStr("role")=="master"&&ConfigReader::getStr("worker")!=""){
+        //
         for(int scheduleAlg=0;scheduleAlg<2;scheduleAlg++){
-            start(routeAlg,scheduleAlg);
+            start(0,scheduleAlg);
+        }
+        for(int scheduleAlg=0;scheduleAlg<2;scheduleAlg++){
+            begin(true,0,scheduleAlg);
+        }
+
+        string workerIp = ConfigReader::getStr("worker");
+        unsigned int workerPort = ConfigReader::getInt("worker_port");
+        for(int scheduleAlg=0;scheduleAlg<2;scheduleAlg++){
+            auto connectionProvider = oatpp::network::tcp::client::ConnectionProvider::createShared({workerIp, workerPort});
+            auto httpExecutor= oatpp::web::client::HttpRequestExecutor::createShared(connectionProvider);
+            auto objectMapper = oatpp::parser::json::mapping::ObjectMapper::createShared();
+            auto client=ControlClient::createShared(httpExecutor,objectMapper);
+            auto resp=client->start("",1,scheduleAlg);
+            string simIdStr=resp->readBodyToString();
+            if(resp->getStatusCode()!=200||simIdStr=="0"){
+                //TODO:
+                cerr<<"worker sim start() error"<<endl;
+            }else{
+                int simId=stoi(simIdStr);
+                networks[2+scheduleAlg]->simID=simId;
+            }
+            
+        }
+        for(int scheduleAlg=0;scheduleAlg<2;scheduleAlg++){
+            auto connectionProvider = oatpp::network::tcp::client::ConnectionProvider::createShared({workerIp, workerPort});
+            auto httpExecutor= oatpp::web::client::HttpRequestExecutor::createShared(connectionProvider);
+            auto objectMapper = oatpp::parser::json::mapping::ObjectMapper::createShared();
+            auto client=ControlClient::createShared(httpExecutor,objectMapper);
+            auto data=client->begin("",1,1,scheduleAlg)->readBodyToString();
+            begin(true,0,scheduleAlg);
+            if(data!="OK"){
+                //TODO:
+                cerr<<"worker sim begin() error"<<endl;
+            }
+        }
+        
+    }
+    else{
+        //单节点
+        for(int routeAlg=0;routeAlg<2;routeAlg++){
+            for(int scheduleAlg=0;scheduleAlg<2;scheduleAlg++){
+                start(routeAlg,scheduleAlg);
+            }
+        }
+        for(int routeAlg=0;routeAlg<2;routeAlg++){
+            for(int scheduleAlg=0;scheduleAlg<2;scheduleAlg++){
+                begin(true,routeAlg,scheduleAlg);
+            }
         }
     }
-    for(int routeAlg=0;routeAlg<2;routeAlg++){
-        for(int scheduleAlg=0;scheduleAlg<2;scheduleAlg++){
-            begin(true,routeAlg,scheduleAlg);
-        }
-    }
+    
 
     return true;
    
@@ -349,29 +445,55 @@ void NetService::begin(bool on,int routeAlg,int scheduleAlg){
     if(status.status=="Complete"){
         return;
     }
-
     {
         if(on){
-            int success=simDao.setSimStatus(network.simID,"Running");
-            if(success==1){
-                std::lock_guard<std::mutex> lock(network.mtx);
-                network.status="Running";
-                std::cout<<"network.status=Running"<<std::endl;
-                network.cv.notify_all();
-            
-            }
+            std::unique_lock<std::mutex> lock(network.mtx);
+            network.status="Running";
+            network.cv.notify_all();
+            // int success=simDao.setSimStatus(network.simID,"Running");
+            // if(success==1){
+                // std::cout<<"network.status=Running"<<std::endl;
+            // }else{
+            //     network.status=originStatus;
+            // }
         }else{
-            int success=simDao.setSimStatus(network.simID,"Pause");
-            if(success==1){
-                std::unique_lock<std::mutex> lock(network.mtx);
-                network.status="Pause";
-            }
+            std::unique_lock<std::mutex> lock(network.mtx);
+            network.status="Pause";
+            // int success=simDao.setSimStatus(network.simID,"Pause");
+            // if(success=1){
+            //     network.cv.notify_all();
+            // }else{
+            //     network.status=originStatus;
+            // }
         }
     }
 }
 
 void NetService::Clear(){
     for(int i=0;i<4;i++){
-        networks[i]->Clear();
+        {
+            std::unique_lock<std::mutex> lock(networks[i]->mtx);
+            networks[i]->status="End";
+            simDao.setSimStatus(networks[i]->simID,"End");
+            networks[i]->Clear();
+            delete networks[i];
+        }
     }
+
+    networks.clear();
+    sims.clear();
+    for(int i=0;i<4;i++){
+        networks.push_back(new CNetwork());
+    }
+    for(int i=0;i<4;i++){
+        sims.push_back(new QKDSim(networks[i]));
+    }
+    groupId=rand();
+
+
+    // network.Clear();
+}
+
+int NetService::deleteSimById(int simId){
+    simDao.deleteSimulations(simId);
 }
