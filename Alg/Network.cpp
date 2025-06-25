@@ -22,14 +22,14 @@ CNetwork::CNetwork(void):simDao()
     // };
     m_routeFactory=make_unique<route::RouteFactory>(this);
 
-    // m_routeStrategy=std::move(m_routeFactory->CreateStrategy(route::RouteType_Bfs));    //BFS
+    m_routeStrategy=std::move(m_routeFactory->CreateStrategy(route::RouteType_Bfs));    //BFS
 
-    m_routeStrategy=std::move(m_routeFactory->CreateStrategy(route::RouteType_KeyRateShortestPath));   //keyrate最短路策略
+    // m_routeStrategy=std::move(m_routeFactory->CreateStrategy(route::RouteType_KeyRateShortestPath));   //keyrate最短路策略
 
     currentScheduleAlg = [this](NODEID nodeId, map<DEMANDID, VOLUME>& relayDemands) -> TIME
     {
-        return this->MinimumRemainingTimeFirst(nodeId, relayDemands);
-        // return this->AverageKeyScheduling(nodeId, relayDemands);
+        // return this->MinimumRemainingTimeFirst(nodeId, relayDemands);
+        return this->AverageKeyScheduling(nodeId, relayDemands);
     };
 }
 
