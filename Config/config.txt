@@ -1,0 +1,8 @@
+master=0.0.0.0
+master_port=8080
+worker=0.0.0.0
+worker_port=8081
+db_host=tcp://127.0.0.1:3306
+user=debian-sys-maint
+password=jEVKZ9vhBRhQ2KHY
+scheme=QKDSIM_DB
