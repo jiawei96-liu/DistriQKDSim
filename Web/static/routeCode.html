@@ -42,6 +42,12 @@
                     <li class="nav-item">
                         <a class="nav-link" href="#" id="relayPathLink">路由策略</a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/schedCode.html" id="simulationResultLink">调度策略</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/history.html" id="simulationResultLink">历史仿真</a>
+                    </li>
                 </ul>
             </div>
         </div>
@@ -49,8 +55,8 @@
 
     <div class="editor-container">
         <div class="mb-3">
-            <label for="filename" class="form-label">文件名</label>
-            <input type="text" class="form-control" id="filename" placeholder="例如：ExampleStrategy.cpp">
+            <label for="filename" class="form-label">CustomRouteStrategy.cpp</label>
+            <!-- <input type="text" class="form-control" id="filename" placeholder="例如：CustomRouteStrategy.cpp"> -->
         </div>
         <div class="mb-3">
             <label for="code" class="form-label">代码内容</label>
@@ -64,12 +70,15 @@
 <script>
 
 window.onload = () => {
-    const defaultTemplate = `#include "ExampleStrategy.h"
+    const defaultTemplate = `#include "CustomRouteStrategy.h"
 #include "Alg/Network.h"
 
 using namespace route;
-bool ExampleStrategy::Route(NODEID sourceId, NODEID sinkId, std::list<NODEID>& nodeList, std::list<LINKID>& linkList) {
-    // BFS 算法实现
+extern "C" route::CustomRouteStrategy* createRouteStrategy(CNetwork* net) {
+    return new route::CustomRouteStrategy(net);
+}
+bool CustomRouteStrategy::Route(NODEID sourceId, NODEID sinkId, std::list<NODEID>& nodeList, std::list<LINKID>& linkList) {
+    // 自定义路由算法实现
     // 获取网络中节点的总数
     UINT NodeNum = static_cast<UINT>(net->m_vAllNodes.size());
 
@@ -170,11 +179,11 @@ bool ExampleStrategy::Route(NODEID sourceId, NODEID sinkId, std::list<NODEID>& n
     }
     const apiBaseUrl = "/api/v1";
     function uploadCode() {
-        const filename = document.getElementById('filename').value;
+        const filename = "CustomRouteStrategy.cpp";
         const code = document.getElementById('code').value;
 
         if (!filename || !code) {
-            document.getElementById('uploadResult').innerText = '文件名和代码内容不能为空。';
+            document.getElementById('uploadResult').innerText = '代码内容不能为空。';
             return;
         }
 
@@ -183,7 +192,13 @@ bool ExampleStrategy::Route(NODEID sourceId, NODEID sinkId, std::list<NODEID>& n
             code: code
         })
         .then(response => {
-            document.getElementById('uploadResult').innerText = '上传成功：' + response.data.message;
+            if (response.status === 200) {
+            document.getElementById('uploadResult').innerText = '编译成功：' + response.data;
+            alert('编译成功：' + response.data)
+            } else {
+                document.getElementById('uploadResult').innerText = '编译失败：' + response.data;
+                alert('编译失败：' + response.data)
+            }
         })
         .catch(error => {
             console.error(error);

@@ -29,5 +29,6 @@ public:
 oatpp::String formatText(const char* text, ...);
 v_int64 getMillisTickCount();
 std::string getCurrentTimeString();
+std::string execWithOutput(const std::string& cmd);
 
 #endif /* Utils_hpp */

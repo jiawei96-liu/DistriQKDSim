@@ -71,7 +71,7 @@ class SimResDto: public oatpp::DTO{
 class SimStatusDto: public oatpp::DTO{
     DTO_INIT(SimStatusDto,DTO)
 
-    DTO_FIELD(Int32,id);    
+    DTO_FIELD(UInt32,id);    
     DTO_FIELD(String,name);
     DTO_FIELD(String,createTime);
     DTO_FIELD(String,status);

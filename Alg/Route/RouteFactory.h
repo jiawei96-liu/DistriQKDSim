@@ -12,6 +12,7 @@ namespace route
 typedef enum {
     RouteType_Bfs,
     RouteType_KeyRateShortestPath,
+    RouteType_Custom,
     RouteType_Unknown
 } RouteStrategyType;
 

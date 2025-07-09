@@ -22,6 +22,8 @@ cmake ..
 make install
 ```
 
+`tips:出错加sudo试试`
+
 正常会安装在`/usr/local/lib/oatpp-1.3.0/`目录下，若不是则后续编译QKDSim需要修改CMakeLists
 
 ## 1.2 mysql驱动安装
@@ -64,16 +66,30 @@ cd build #一定要在build目录下运行
 
 随后访问http://localhost:8080即可
 
-## 1.4 修改部署的IP和端口
+## 1.5 修改部署的IP和端口
 `Config/config.txt`
 
 ```ini
-host=0.0.0.0 #部署ip 
-port=8080   #部署端口
-db_host=tcp://127.0.0.1:3306    #数据库ip和端口
-user=your_db_user   #db用户名
-password=your_password  #db密码
-scheme=QKDSIM_DB    
+# 单机
+master=172.16.50.87 #主节点ip
+master_port=8080 
+db_host=tcp://172.16.50.83:3306 #db地址
+user=qkdsim #db用户名
+password=qkdsim@0123! #db密码
+scheme=QKDSIM_DB #db库名
+
+```
+
+```ini
+# 分布式
+master=172.16.50.87
+master_port=8080
+worker=172.16.50.86
+worker_port=8080
+db_host=tcp://172.16.50.83:3306
+user=qkdsim
+password=qkdsim@0123!
+scheme=QKDSIM_DB
 ```
 
 

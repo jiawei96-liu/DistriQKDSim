@@ -200,9 +200,9 @@ void CDemand::InitRelayPath(list<NODEID>& nodeList, list<LINKID>& linkList) //åœ
     {
         m_Path.m_mNextNode[curNode] = *nodeIter;
         curNode = *nodeIter;
-        cout<<curNode<<'->';
+        // cout<<curNode<<'->';
     }
-    cout<<endl;
+    // cout<<endl;
 }
 
 bool CDemand::GetAllDelivered()

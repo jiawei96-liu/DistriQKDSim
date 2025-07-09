@@ -5,12 +5,14 @@
 #include "Demand.h"
 #include "NetEvent.h"
 #include "Store.hpp"
-#include "Web/dao/SimDao.hpp"
 #include "Alg/Route/RouteFactory.h"
+#include "Alg/Sched/SchedFactory.h"
 //#include "KeyManager.h"
 #include <functional>
 #include <condition_variable>
 #include <mutex>
+
+class SimDao;
 
 class CNetwork
 {
@@ -46,12 +48,17 @@ private:
     UINT m_uiNodeNum;	// �����еĽڵ�����
     UINT m_uiLinkNum;	// �����е���·����
     UINT m_uiDemandNum;	// �����е���������
+public:
     TIME m_dSimTime;	// ��ǰģ��ʱ��
     UINT m_step;        // ִ�в���
+private:
     std::unique_ptr<route::RouteFactory> m_routeFactory;    //·�ɲ��Թ���
     std::unique_ptr<route::RouteStrategy> m_routeStrategy;  //��ǰ·�ɲ���
+
+    std::unique_ptr<sched::SchedFactory> m_schedFactory;    //·�ɲ��Թ���
+    std::unique_ptr<sched::SchedStrategy> m_schedStrategy;  //��ǰ·�ɲ���
     SimResultStore simResStore;
-    SimDao simDao;
+    SimDao* simDao;
 
 
 public:
@@ -154,17 +161,30 @@ public:
     }
     void setMinimumRemainingTimeFirst()
     {
-        currentScheduleAlg = [this](NODEID nodeId, map<DEMANDID, VOLUME>& relayDemands) -> TIME
-        {
-            return this->MinimumRemainingTimeFirst(nodeId, relayDemands);
-        };
+        m_schedStrategy=std::move(m_schedFactory->CreateStrategy(sched::SchedType_Min));
+        // currentScheduleAlg = [this](NODEID nodeId, map<DEMANDID, VOLUME>& relayDemands) -> TIME
+        // {
+            // return this->MinimumRemainingTimeFirst(nodeId, relayDemands);
+        // };
     }
     void setAverageKeyScheduling()
     {
-        currentScheduleAlg = [this](NODEID nodeId, map<DEMANDID, VOLUME>& relayDemands) -> TIME
-        {
-            return this->AverageKeyScheduling(nodeId, relayDemands);
-        };
+        m_schedStrategy=std::move(m_schedFactory->CreateStrategy(sched::SchedType_Avg));
+        // currentScheduleAlg = [this](NODEID nodeId, map<DEMANDID, VOLUME>& relayDemands) -> TIME
+        // {
+        //     return this->AverageKeyScheduling(nodeId, relayDemands);
+        // };
+    }
+
+
+    void setCustomRoute(){
+        m_routeStrategy=std::move(m_routeFactory->CreateStrategy(route::RouteType_Custom));
+    }
+
+    void setCustomSched(){
+        m_schedStrategy=std::move(m_schedFactory->CreateStrategy(sched::SchedType_Custom));
     }
 };
+
+
 
