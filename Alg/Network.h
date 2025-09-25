@@ -9,6 +9,8 @@
 #include <functional>
 
 class CNetwork
+    // 新增：初始化节点和链路（带子域、网关属性）
+    void LoadNetworkFullCSV(const std::string& filename);
 {
 public:
     CNetwork(void);
@@ -141,10 +143,27 @@ public:
     }
     void setAverageKeyScheduling()
     {
-        currentScheduleAlg = [this](NODEID nodeId, map<DEMANDID, VOLUME>& relayDemands) -> TIME
-        {
-            return this->AverageKeyScheduling(nodeId, relayDemands);
-        };
+        m_schedStrategy=std::move(m_schedFactory->CreateStrategy(sched::SchedType_Avg));
+        // currentScheduleAlg = [this](NODEID nodeId, map<DEMANDID, VOLUME>& relayDemands) -> TIME
+        // {
+        //     return this->AverageKeyScheduling(nodeId, relayDemands);
+        // };
+    }
+
+    void setOspfRoute()
+    {
+        m_routeStrategy=std::move(m_routeFactory->CreateStrategy(route::RouteType_Ospf));
+    }
+
+
+    void setCustomRoute(){
+        m_routeStrategy=std::move(m_routeFactory->CreateStrategy(route::RouteType_Custom));
+    }
+
+    void setCustomSched(){
+        m_schedStrategy=std::move(m_schedFactory->CreateStrategy(sched::SchedType_Custom));
     }
 };
+
+
 

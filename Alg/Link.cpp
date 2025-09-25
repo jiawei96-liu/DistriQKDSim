@@ -7,8 +7,11 @@ CLink::CLink(void)
 }
 
 
-CLink::~CLink(void)
+
+CLink::CLink(void)
+    : m_uiLinkId(0), m_uiSourceId(0), m_uiSinkId(0), m_dQKDRate(0), m_dDelay(0), m_dBandwidth(0), m_dFaultTime(0), m_iSubdomainId(0), m_dWeight(0)
 {
+    wait_or_not = true;
 }
 
 CLink::CLink(const CLink& link)
@@ -20,12 +23,10 @@ CLink::CLink(const CLink& link)
     m_dDelay = link.m_dDelay;
     m_KeyManager = link.m_KeyManager;
     m_dBandwidth = link.m_dBandwidth;
-//    m_lCarriedDemands = link.m_lCarriedDemands;
+    m_lCarriedDemands = link.m_lCarriedDemands;
     m_dFaultTime = link.m_dFaultTime;
-
+    m_iSubdomainId = link.m_iSubdomainId;
     m_dWeight = link.m_dWeight;
-
-    
     wait_or_not = link.wait_or_not;
 }
 
@@ -34,6 +35,7 @@ void CLink::operator=(const CLink& link)
     m_uiLinkId = link.m_uiLinkId;
     m_uiSourceId = link.m_uiSourceId;
     m_uiSinkId = link.m_uiSinkId;
+    m_iSubdomainId = link.m_iSubdomainId;
     m_dQKDRate = link.m_dQKDRate;
     m_dDelay = link.m_dDelay;
     m_KeyManager = link.m_KeyManager;

@@ -1,4 +1,63 @@
-﻿#include "Network.h"
+﻿#include <fstream>
+#include <sstream>
+
+
+// 从 network_full.csv 读取链路和节点属性，自动补全节点信息
+void CNetwork::LoadNetworkFullCSV(const std::string& filename) {
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "无法打开网络文件: " << filename << std::endl;
+        return;
+    }
+    std::string line;
+    std::getline(file, line); // 跳过表头
+    while (std::getline(file, line)) {
+        std::stringstream ss(line);
+        std::string item;
+        std::vector<std::string> tokens;
+        while (std::getline(ss, item, ',')) {
+            tokens.push_back(item);
+        }
+        if (tokens.size() < 13) continue;
+        LINKID linkId = std::stoi(tokens[0]);
+        NODEID src = std::stoi(tokens[1]);
+        NODEID dst = std::stoi(tokens[2]);
+        double keyRate = std::stod(tokens[3]);
+        double delay = std::stod(tokens[4]);
+        double bandwidth = std::stod(tokens[5]);
+        double weight = std::stod(tokens[6]);
+        double faultTime = std::stod(tokens[7]);
+        int is_cross = std::stoi(tokens[8]);
+        int src_subdomain = std::stoi(tokens[9]);
+        bool src_isGateway = std::stoi(tokens[10]) != 0;
+        int dst_subdomain = std::stoi(tokens[11]);
+        bool dst_isGateway = std::stoi(tokens[12]) != 0;
+        // 节点信息补全
+        if (src >= m_vAllNodes.size()) m_vAllNodes.resize(src+1);
+        if (dst >= m_vAllNodes.size()) m_vAllNodes.resize(dst+1);
+        m_vAllNodes[src].SetNodeId(src);
+        m_vAllNodes[src].SetSubdomainId(src_subdomain);
+        m_vAllNodes[src].SetIsGateway(src_isGateway);
+        m_vAllNodes[dst].SetNodeId(dst);
+        m_vAllNodes[dst].SetSubdomainId(dst_subdomain);
+        m_vAllNodes[dst].SetIsGateway(dst_isGateway);
+        // 链路信息
+        if (linkId >= m_vAllLinks.size()) m_vAllLinks.resize(linkId+1);
+        CLink link;
+        link.SetLinkId(linkId);
+        link.SetSourceId(src);
+        link.SetSinkId(dst);
+        link.SetQKDRate(keyRate);
+        link.SetLinkDelay(delay);
+        link.SetBandwidth(bandwidth);
+        link.SetWeight(weight);
+        link.SetFaultTime(faultTime);
+        link.SetSubdomainId(is_cross ? -1 : src_subdomain);
+        m_vAllLinks[linkId] = link;
+    }
+    file.close();
+}
+#include "Network.h"
 #include "Link.h"
 #include <iostream>
 #include <chrono>

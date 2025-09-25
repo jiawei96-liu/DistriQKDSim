@@ -3,6 +3,11 @@
 #include "KeyRateStrategy.h"
 #include "BidBfsStrategy.h"
 #include "KeyRateFibStrategy.h"
+#include "CustomRouteStrategy.h"
+#include "OspfStrategy.h"
+#include "BgpStrategy.h"
+#include <dlfcn.h>
+#include <memory>
 #include "Alg/Network.h"
 #include <iostream>
 
@@ -27,7 +32,17 @@ std::unique_ptr<RouteStrategy> RouteFactory::CreateStrategy(RouteStrategyType ty
         return std::make_unique<KeyRateStrategy>(net);  //二叉堆
         
         // return std::make_unique<KeyRateFibStrategy>(net);    //斐波那契堆
-    }else {
+    } else if (type == RouteType_Ospf) {
+        cout << "OSPF" << endl;
+        return std::make_unique<OspfStrategy>(net);
+    } else if (type == RouteType_Bgp) {
+        cout << "BGP" << endl;
+        return std::make_unique<BgpStrategy>(net);
+    } else if (type == RouteType_Custom) {
+        cout << "自定义路由算法" << endl;
+        unloadUserRouteStrategy();
+        return loadUserCustomRouteStrategy(net);  //动态加载用户实现
+    } else {
         std::cerr << "Unknown strategy type: " << type << std::endl;
     }
     return nullptr;

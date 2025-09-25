@@ -16,21 +16,25 @@ public:
 
 
 private:
-    LINKID m_uiLinkId;	// 链路的唯一标识符
-    NODEID m_uiSourceId;	// 链路的源节点ID
-    NODEID m_uiSinkId;	// 链路的目的节点ID（汇节点）
-    RATE m_dQKDRate;	// 链路的量子密钥分发（QKD）速率
-    TIME m_dDelay;	// 链路的传输延迟
-    RATE m_dBandwidth;	// 链路的带宽
+    LINKID m_uiLinkId; // 链路的唯一标识符
+    NODEID m_uiSourceId; // 链路的源节点ID
+    NODEID m_uiSinkId; // 链路的目的节点ID（汇节点）
+    RATE m_dQKDRate; // 链路的量子密钥分发（QKD）速率
+    TIME m_dDelay; // 链路的传输延迟
+    RATE m_dBandwidth; // 链路的带宽
 
-    TIME m_dFaultTime;	// 链路故障的时间
+    TIME m_dFaultTime; // 链路故障的时间
 
-    CKeyManager m_KeyManager;	// 与链路相关联的密钥管理器，用于管理链路上的密钥分发和消耗
+    CKeyManager m_KeyManager; // 与链路相关联的密钥管理器，用于管理链路上的密钥分发和消耗
     //TIME m_dLastSimTime = 0; // 用于记录上一次密钥更新的时间，初始化为0或其它适当初值
 
+    int m_iSubdomainId = 0; // 子域标识，默认0
 
-private://data structure for algorithms
-    WEIGHT m_dWeight;	// 链路的权重，用于路径选择算法中
+private: //data structure for algorithms
+    WEIGHT m_dWeight; // 链路的权重，用于路径选择算法中
+public:
+    void SetSubdomainId(int subdomainId) { m_iSubdomainId = subdomainId; }
+    int GetSubdomainId() const { return m_iSubdomainId; }
 
 public:
 //    list<DEMANDID> m_lCarriedDemands;	// 一个需求ID的列表，表示当前链路上正在传输的所有需求   ？？用法感觉不对
