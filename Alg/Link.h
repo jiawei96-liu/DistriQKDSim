@@ -37,7 +37,7 @@ public:
     int GetSubdomainId() const { return m_iSubdomainId; }
 
 public:
-//    list<DEMANDID> m_lCarriedDemands;	// 一个需求ID的列表，表示当前链路上正在传输的所有需求   ？？用法感觉不对
+    // list<DEMANDID> m_lCarriedDemands;	// 一个需求ID的列表，表示当前链路上正在传输的所有需求   ？？用法感觉不对
 
     // 添加互斥锁保护共享数据
     std::mutex m_mutex; // 保护链路数据的互斥锁

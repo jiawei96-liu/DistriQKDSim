@@ -13,6 +13,7 @@ add_library(alg STATIC
     Route/BfsStrategy.cpp
     Route/KeyRateStrategy.cpp
     Route/BidBfsStrategy.cpp
+<<<<<<< HEAD
     Route/CustomRouteStrategy.cpp 
     Route/RouteFactory.cpp
     Route/KeyRateFibStrategy.cpp
@@ -22,9 +23,17 @@ add_library(alg STATIC
     Sched/CustomSchedStrategy.cpp
     Sched/MinStrategy.cpp
     Sched/SchedFactory.cpp
+=======
+    Route/RouteFactory.cpp
+    Route/KeyRateFibStrategy.cpp
+>>>>>>> c66e6e80c3ba5c561d69e4e3032ca582f436e051
     # main_new.cpp
 )
 
 # 设置包含目录
+<<<<<<< HEAD
 target_include_directories(alg PUBLIC ${CMAKE_SOURCE_DIR} ${OATPP_INCLUDE_DIR})
 target_link_libraries(alg PUBLIC dl)
+=======
+target_include_directories(alg PUBLIC ${CMAKE_SOURCE_DIR} ${OATPP_INCLUDE_DIR})
+>>>>>>> c66e6e80c3ba5c561d69e4e3032ca582f436e051

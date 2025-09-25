@@ -11,6 +11,8 @@
 #include "Alg/Network.h"
 #include <iostream>
 
+// #include "YourStrategy.h" //自定义路由函数文件
+
 using namespace route ;
 
 RouteFactory::RouteFactory(CNetwork* network) : net(network) {
