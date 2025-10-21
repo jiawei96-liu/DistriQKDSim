@@ -2,6 +2,7 @@
 #include "Alg/Network.h"
 #include "BgpStrategy.h"
 #include <set>
+#include <iostream>
 
 using namespace route;
 
@@ -9,7 +10,12 @@ using namespace route;
 // net_：指向全局网络对象
 MultiDomainRouteManager::MultiDomainRouteManager(CNetwork* net_) : net(net_) {
     // BGP策略对象只需一份，专用于跨域需求
-    bgpStrategy = std::make_unique<BgpStrategy>(net);
+    try {
+        bgpStrategy = std::make_unique<BgpStrategy>(net);
+    } catch (...) {
+        std::cerr << "[MultiDomainRouteManager] Warning: failed to create default BGP strategy" << std::endl;
+        bgpStrategy = nullptr;
+    }
 }
 
 // 析构函数：自动清理所有已创建的域内路由对象
@@ -19,52 +25,108 @@ MultiDomainRouteManager::~MultiDomainRouteManager() {
 
 // 配置某个子域的路由类型（如OSPF、BFS、KeyRate等），支持动态切换
 void MultiDomainRouteManager::SetDomainStrategy(int subdomainId, RouteStrategyType type) {
+    std::lock_guard<std::mutex> lock(mtx);
     domainStrategyMap[subdomainId] = type;
     // 清理旧对象，延迟重建，保证切换协议时生效
-    domainStrategyObj.erase(subdomainId);
+    if (domainStrategyObj.count(subdomainId)) {
+        domainStrategyObj.erase(subdomainId);
+        std::cerr << "[MultiDomainRouteManager] Domain " << subdomainId << " strategy changed, old object removed" << std::endl;
+    }
 }
 
 // 查询某个子域当前配置的路由类型，未配置则返回默认类型
 RouteStrategyType MultiDomainRouteManager::GetDomainStrategy(int subdomainId) const {
+    std::lock_guard<std::mutex> lock(mtx);
     auto it = domainStrategyMap.find(subdomainId);
     return it != domainStrategyMap.end() ? it->second : defaultStrategy;
 }
 
 // 设置所有未显式配置子域的默认路由类型
 void MultiDomainRouteManager::SetDefaultStrategy(RouteStrategyType type) {
+    std::lock_guard<std::mutex> lock(mtx);
     defaultStrategy = type;
 }
 
 // 获取当前默认路由类型
 RouteStrategyType MultiDomainRouteManager::GetDefaultStrategy() const {
+    std::lock_guard<std::mutex> lock(mtx);
     return defaultStrategy;
 }
 
 // 获取所有已注册的子域ID集合
 std::set<int> MultiDomainRouteManager::GetAllDomains() const {
     std::set<int> domains;
+    std::lock_guard<std::mutex> lock(mtx);
     for (const auto& kv : domainStrategyMap) domains.insert(kv.first);
     return domains;
 }
 
 // 清理所有已创建的域内路由对象（如需重置或析构时调用）
 void MultiDomainRouteManager::ClearAllStrategies() {
+    std::lock_guard<std::mutex> lock(mtx);
     domainStrategyObj.clear();
+    domainStrategyMap.clear();
+    std::cerr << "[MultiDomainRouteManager] Cleared all domain strategies" << std::endl;
 }
 
 // 注入/替换BGP策略对象（如需自定义BGP实现时使用）
 void MultiDomainRouteManager::SetBgpStrategy(std::unique_ptr<RouteStrategy> bgp) {
+    std::lock_guard<std::mutex> lock(mtx);
     bgpStrategy = std::move(bgp);
+    std::cerr << "[MultiDomainRouteManager] BGP strategy injected/updated" << std::endl;
+}
+
+void MultiDomainRouteManager::RemoveDomainStrategy(int subdomainId) {
+    std::lock_guard<std::mutex> lock(mtx);
+    domainStrategyMap.erase(subdomainId);
+    if (domainStrategyObj.count(subdomainId)) {
+        domainStrategyObj.erase(subdomainId);
+    }
+    std::cerr << "[MultiDomainRouteManager] Removed strategy for domain " << subdomainId << std::endl;
+}
+
+void MultiDomainRouteManager::ApplyDomainStrategyNow(int subdomainId) {
+    std::lock_guard<std::mutex> lock(mtx);
+    // Force rebuild the strategy object
+    domainStrategyObj.erase(subdomainId);
+    // create now
+    RouteStrategyType type = defaultStrategy;
+    if (domainStrategyMap.count(subdomainId)) type = domainStrategyMap[subdomainId];
+    if (net && net->m_routeFactory) {
+        auto ptr = net->m_routeFactory->CreateStrategy(type);
+        if (ptr) {
+            domainStrategyObj[subdomainId] = std::move(ptr);
+            std::cerr << "[MultiDomainRouteManager] Applied strategy for domain " << subdomainId << std::endl;
+        } else {
+            std::cerr << "[MultiDomainRouteManager] Warning: factory failed to create strategy for domain " << subdomainId << std::endl;
+        }
+    } else {
+        std::cerr << "[MultiDomainRouteManager] Error: network or routeFactory null when applying domain strategy" << std::endl;
+    }
 }
 
 // 确保某个子域的路由对象已创建，延迟初始化，避免重复创建
 void MultiDomainRouteManager::ensureDomainStrategy(int subdomainId) {
+    std::lock_guard<std::mutex> lock(mtx);
     if (domainStrategyObj.count(subdomainId) == 0) {
         RouteStrategyType type = defaultStrategy;
-        if (domainStrategyMap.count(subdomainId))
-            type = domainStrategyMap[subdomainId];
+        if (domainStrategyMap.count(subdomainId)) type = domainStrategyMap[subdomainId];
         // 通过工厂创建对应类型的路由对象
-        domainStrategyObj[subdomainId] = net->m_routeFactory->CreateStrategy(type);
+        if (!net) {
+            std::cerr << "[MultiDomainRouteManager] Error: network pointer is null" << std::endl;
+            return;
+        }
+        if (!net->m_routeFactory) {
+            std::cerr << "[MultiDomainRouteManager] Error: routeFactory is null" << std::endl;
+            return;
+        }
+        try {
+            auto ptr = net->m_routeFactory->CreateStrategy(type);
+            if (ptr) domainStrategyObj[subdomainId] = std::move(ptr);
+            else std::cerr << "[MultiDomainRouteManager] Warning: factory returned null for domain " << subdomainId << std::endl;
+        } catch (...) {
+            std::cerr << "[MultiDomainRouteManager] Exception when creating strategy for domain " << subdomainId << std::endl;
+        }
     }
 }
 
@@ -73,15 +135,35 @@ void MultiDomainRouteManager::ensureDomainStrategy(int subdomainId) {
 // nodeList, linkList：输出路径节点序列和链路序列
 // 返回值：true=路由成功，false=不可达
 bool MultiDomainRouteManager::Route(NODEID sourceId, NODEID sinkId, std::list<NODEID>& nodeList, std::list<LINKID>& linkList) {
-    // 获取源/目的节点所属子域
+    // 边界检查
+    if (!net) {
+        std::cerr << "[MultiDomainRouteManager] Error: network pointer is null" << std::endl;
+        return false;
+    }
+    if (sourceId < 0 || sourceId >= (NODEID)net->m_vAllNodes.size() || sinkId < 0 || sinkId >= (NODEID)net->m_vAllNodes.size()) {
+        std::cerr << "[MultiDomainRouteManager] Error: sourceId or sinkId out of range" << std::endl;
+        return false;
+    }
+
     int srcDomain = net->m_vAllNodes[sourceId].GetSubdomainId();
     int dstDomain = net->m_vAllNodes[sinkId].GetSubdomainId();
     if (srcDomain == dstDomain) {
         // 域内需求，自动调用对应子域协议
         ensureDomainStrategy(srcDomain);
-        return domainStrategyObj[srcDomain]->Route(sourceId, sinkId, nodeList, linkList);
+        std::lock_guard<std::mutex> lock(mtx);
+        auto it = domainStrategyObj.find(srcDomain);
+        if (it == domainStrategyObj.end() || !(it->second)) {
+            std::cerr << "[MultiDomainRouteManager] Error: domain strategy object missing for domain " << srcDomain << std::endl;
+            return false;
+        }
+        return it->second->Route(sourceId, sinkId, nodeList, linkList);
     } else {
         // 跨域需求，自动调用BGP
-        return bgpStrategy ? bgpStrategy->Route(sourceId, sinkId, nodeList, linkList) : false;
+        std::lock_guard<std::mutex> lock(mtx);
+        if (!bgpStrategy) {
+            std::cerr << "[MultiDomainRouteManager] Error: BGP strategy not set" << std::endl;
+            return false;
+        }
+        return bgpStrategy->Route(sourceId, sinkId, nodeList, linkList);
     }
 }

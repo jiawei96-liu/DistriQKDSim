@@ -6,7 +6,7 @@ class CNode
 {
 public:
     CNode(void);
-    ~CNode(void);
+    ~CNode(void)=default;
     CNode(const CNode& Node);
     void operator=(const CNode& Node);
 
@@ -33,7 +33,7 @@ public:
 
 public:
     void SetNodeId(NODEID nodeId);
-    NODEID GetNodeId();
+    NODEID GetNodeId() const;
 
 };
 

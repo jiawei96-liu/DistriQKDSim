@@ -4,33 +4,33 @@
 #include <string>
 #include <functional>
 #include <unordered_map>
-#include "IRouteStrategy.h"
+// #include "IRouteStrategy.h"
 
-namespace route {
+// namespace route {
 
-// 路由策略工厂类
-// 负责注册和创建所有支持的路由策略对象，支持按名称动态生成
-// 典型用法：
-//   RouteFactory::RegisterAll();
-//   auto* strategy = RouteFactory::Create("ospf");
-class RouteFactory {
-public:
-    using CreatorFunc = std::function<IRouteStrategy*()>;
-    // 注册所有支持的路由策略
-    void RegisterAll();
-    // 注册单个路由策略
-    void Register(const std::string& name, CreatorFunc func);
-    // 创建指定名称的路由策略对象
-    IRouteStrategy* Create(const std::string& name);
-private:
-    std::unordered_map<std::string, CreatorFunc> m_mCreators; // 策略名称到创建函数的映射
-};
+// // 路由策略工厂类
+// // 负责注册和创建所有支持的路由策略对象，支持按名称动态生成
+// // 典型用法：
+// //   RouteFactory::RegisterAll();
+// //   auto* strategy = RouteFactory::Create("ospf");
+// class RouteFactory {
+// public:
+//     using CreatorFunc = std::function<IRouteStrategy*()>;
+//     // 注册所有支持的路由策略
+//     void RegisterAll();
+//     // 注册单个路由策略
+//     void Register(const std::string& name, CreatorFunc func);
+//     // 创建指定名称的路由策略对象
+//     IRouteStrategy* Create(const std::string& name);
+// private:
+//     std::unordered_map<std::string, CreatorFunc> m_mCreators; // 策略名称到创建函数的映射
+// };
 
-} // namespace route
+// } // namespace route
 
-#endif // ROUTE_FACTORY_H
-#ifndef ROUTE_FACTORY_H
-#define ROUTE_FACTORY_H
+// #endif // ROUTE_FACTORY_H
+// #ifndef ROUTE_FACTORY_H
+// #define ROUTE_FACTORY_H
 
 #include<memory>
 #include "Alg/stdafx.h"
@@ -46,6 +46,7 @@ typedef enum {
     RouteType_Ospf,
     RouteType_Bgp,
     RouteType_Custom,
+    RouteType_demo,
     RouteType_Unknown
 } RouteStrategyType;
 

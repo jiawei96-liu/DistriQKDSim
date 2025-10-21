@@ -1,5 +1,7 @@
 master=172.16.50.87
 master_port=8080
+worker=172.16.50.86
+worker_port=8080
 db_host=tcp://172.16.50.83:3306
 user=qkdsim
 password=qkdsim@0123!

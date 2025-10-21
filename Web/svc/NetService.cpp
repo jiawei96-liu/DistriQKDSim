@@ -11,6 +11,10 @@
 std::unique_ptr<NetService> NetService::instance = nullptr;
 std::once_flag NetService::initFlag;
 
+int getIndex(int routeAlg,int scheduleAlg){
+    return routeAlg*3+scheduleAlg;
+}
+
 oatpp::Object<ListDto<oatpp::Object<DemandDto>>> NetService::getAllDemands(){
     auto res = ListDto<oatpp::Object<DemandDto>>::createShared();
     res->items={};
@@ -165,7 +169,7 @@ oatpp::Object<ListDto<oatpp::Object<SimResDto>>> NetService::getSimRes(int route
     auto res = ListDto<oatpp::Object<SimResDto>>::createShared();
     res->items={};
     res->count=(unsigned int)0;
-    auto &network=*networks[route*2+sched];
+    auto &network=*networks[getIndex(route,sched)];
     for (NODEID nodeId = 0; nodeId < network.GetNodeNum(); nodeId++)
     {
         for (auto demandIter = network.m_vAllNodes[nodeId].m_mRelayVolume.begin(); demandIter != network.m_vAllNodes[nodeId].m_mRelayVolume.end();)
@@ -243,7 +247,8 @@ oatpp::Object<ListDto<oatpp::Object<SimResDto>>> NetService::getSimRes(int route
 oatpp::Object<ListDto<oatpp::Object<SimResDto>>> NetService::getSimResByStep(int route,int sched,int step){
     vector<SimResDto> res;
     TIME currentTime;
-    auto &network=*networks[route*2+sched];
+    
+    auto &network=*networks[getIndex(route,sched)];
     simDao.getSimRes(network.simID,step,res,currentTime);
 
     auto ret = ListDto<oatpp::Object<SimResDto>>::createShared();
@@ -275,7 +280,7 @@ oatpp::Object<SimStatusDto> NetService::getSimStatus(int route,int sched,int sim
     auto ret=SimStatusDto::createShared();
 
     if(simID==0){
-        auto &network=*networks[route*2+sched];
+        auto &network=*networks[getIndex(route,sched)];
         int success=simDao.getSimStatus(network.simID,*ret.getPtr());
 
         ret->status=network.status;
@@ -292,7 +297,7 @@ oatpp::Object<SimResStatusDto> NetService::getSimResStatusByStep(int route,int s
     vector<SimResDto> res;
     TIME currentTime;
     if(simId==0){
-        auto &network=*networks[route*2+sched];
+        auto &network=*networks[getIndex(route,sched)];
         simDao.getSimRes(network.simID,step,res,currentTime);
     }else{
         simDao.getSimRes(simId,step,res,currentTime);
@@ -316,7 +321,7 @@ oatpp::Object<SimMetricDto> NetService::getSimMetric(int route,int sched,int ste
     SimMetricDto res;
     TIME currentTime;
     if(simId==0){
-        auto &network=*networks[route*2+sched];
+        auto &network=*networks[getIndex(route,sched)];
         // simDao.getSimRes(network.simID,step,res,currentTime);
         simDao.getSimMetric(network.simID,step,res);
     }else{
@@ -341,15 +346,17 @@ void NetService::next10Step(){
     }
 }
 
-int NetService::start(int routeAlg,int scheduleAlg){
+int NetService::start(int routeAlg,int scheduleAlg,bool _begin){
 
-    auto &network=*networks[routeAlg*2+scheduleAlg];
+    auto &network=*networks[getIndex(routeAlg,scheduleAlg)];
     // simDao.clear();
     if(routeAlg==0){
         network.setShortestPath();
     }else if (routeAlg==1)
     {
         network.setKeyRateShortestPath();
+    }else if (routeAlg==2){
+        network.setCustomRoute();
     }else{
         return false;
     }
@@ -358,7 +365,10 @@ int NetService::start(int routeAlg,int scheduleAlg){
         network.setMinimumRemainingTimeFirst();
     }else if (scheduleAlg==1){
         network.setAverageKeyScheduling();
-    }else{
+    }else if(scheduleAlg==2){
+        network.setCustomSched();
+    }
+    else{
         return false;
     }
     // network.InitRelayPath(std::thread::hardware_concurrency());
@@ -373,7 +383,9 @@ int NetService::start(int routeAlg,int scheduleAlg){
 
     std::thread backgroundThread(&CNetwork::RunInBackGround, &network);
     backgroundThread.detach();
-    
+    if(_begin){
+        begin(true,routeAlg,scheduleAlg);
+    }
     return network.simID;
 }
 
@@ -401,7 +413,7 @@ bool NetService::allStart(){
                 cerr<<"worker sim start() error"<<endl;
             }else{
                 int simId=stoi(simIdStr);
-                networks[2+scheduleAlg]->simID=simId;
+                networks[getIndex(1,scheduleAlg)]->simID=simId;
             }
             
         }
@@ -438,9 +450,11 @@ bool NetService::allStart(){
    
 }
 
+
+
 void NetService::begin(bool on,int routeAlg,int scheduleAlg){
     SimStatusDto status;
-    auto& network=*networks[routeAlg*2+scheduleAlg];
+    auto& network=*networks[getIndex(routeAlg,scheduleAlg)];
     simDao.getSimStatus(network.simID,status);
     if(status.status=="Complete"){
         return;
@@ -470,7 +484,7 @@ void NetService::begin(bool on,int routeAlg,int scheduleAlg){
 }
 
 void NetService::Clear(){
-    for(int i=0;i<4;i++){
+    for(int i=0;i<9;i++){
         {
             std::unique_lock<std::mutex> lock(networks[i]->mtx);
             networks[i]->status="End";
@@ -482,11 +496,13 @@ void NetService::Clear(){
 
     networks.clear();
     sims.clear();
-    for(int i=0;i<4;i++){
+    for(int i=0;i<9;i++){
         networks.push_back(new CNetwork());
+        // networks.push_back(nullptr);
     }
-    for(int i=0;i<4;i++){
+    for(int i=0;i<9;i++){
         sims.push_back(new QKDSim(networks[i]));
+        // sims.push_back(nullptr);
     }
     groupId=rand();
 

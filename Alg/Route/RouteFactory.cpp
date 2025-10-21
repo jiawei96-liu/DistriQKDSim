@@ -15,6 +15,42 @@
 
 using namespace route ;
 
+// // 函数指针类型：用户动态库中导出的 createRouteStrategy 工厂函数
+using CreateFunc = CustomRouteStrategy* (*)(CNetwork*);
+
+namespace {
+    void* handle = nullptr;
+    CreateFunc createFunc = nullptr;
+}
+std::unique_ptr<CustomRouteStrategy> loadUserCustomRouteStrategy(CNetwork* net) {
+    if (!handle) {
+        handle = dlopen("../Alg/Route/libUserRoute.so", RTLD_NOW);
+        if (!handle) {
+            std::cerr << "dlopen failed: " << dlerror() << std::endl;
+            return nullptr;
+        }
+
+        createFunc = (CreateFunc)dlsym(handle, "createRouteStrategy");
+        if (!createFunc) {
+            std::cerr << "dlsym failed: " << dlerror() << std::endl;
+            dlclose(handle);
+            handle = nullptr;
+            return nullptr;
+        }
+    }
+
+    return std::unique_ptr<CustomRouteStrategy>(createFunc(net));
+}
+
+void unloadUserRouteStrategy() {
+    if (handle) {
+        dlclose(handle);
+        handle = nullptr;
+        createFunc = nullptr;
+        std::cout << "旧的自定义策略库已卸载" << std::endl;
+    }
+}
+
 RouteFactory::RouteFactory(CNetwork* network) : net(network) {
     // std::cout << "RouteFactory created with network\n";
 }
@@ -49,4 +85,5 @@ std::unique_ptr<RouteStrategy> RouteFactory::CreateStrategy(RouteStrategyType ty
     }
     return nullptr;
 }
+
 

@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>调度策略</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        .editor-container {
+            margin-top: 20px;
+        }
+        .code-editor {
+            width: 100%;
+            height: 400px;
+            font-family: monospace;
+            font-size: 14px;
+            padding: 10px;
+            border: 1px solid #ced4da;
+            border-radius: 5px;
+            background-color: #f8f9fa;
+            resize: vertical;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">调度策略</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/" id="inputInfoLink">输入信息</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/sim.html" id="simulationResultLink">仿真结果</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/routeCode.html" id="relayPathLink">路由策略</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" id="relayPathLink">调度策略</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/history.html" id="relayPathLink">历史仿真</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="editor-container">
+        <div class="mb-3">
+            <label for="filename" class="form-label">CustomSchedStrategy.cpp</label>
+        </div>
+        <div class="mb-3">
+            <label for="code" class="form-label">代码内容</label>
+            <textarea class="code-editor" id="code" placeholder="# 在这里编写你的代码..."></textarea>
+        </div>
+        <button class="btn btn-success" onclick="uploadCode()">上传代码</button>
+        <div id="uploadResult" class="mt-3"></div>
+    </div>
+</div>
+
+<script>
+
+window.onload = () => {
+    const defaultTemplate = `#include "CustomSchedStrategy.h"
+#include "Alg/Network.h"
+
+using namespace sched;
+
+extern "C" sched::CustomSchedStrategy* createSchedStrategy(CNetwork* net) {
+    return new sched::CustomSchedStrategy(net);
+}
+TIME CustomSchedStrategy::Sched(NODEID nodeId, map<DEMANDID, VOLUME> &relayDemands) {
+    TIME executeTime = INF;                // 表示当前的最小执行时间
+    map<LINKID, DEMANDID> scheduledDemand; // 记录每条链路上计划要转发的需求
+    map<DEMANDID, TIME> executeTimeDemand; // 记录需求的执行时间
+    std::random_device rd;  // 用于获取随机种子
+    std::mt19937 gen(rd()); // 使用 Mersenne Twister 算法生成随机数
+    std::uniform_int_distribution<> dis(0, 1); // 定义一个分布，生成 0 或 1
+
+    auto& m_vAllLinks=net->m_vAllLinks;
+    auto& m_dSimTime=net->m_dSimTime;
+    auto& m_vAllDemands=net->m_vAllDemands;
+    auto& m_vAllNodes=net->m_vAllNodes;
+    auto& m_mNodePairToLink=net->m_mNodePairToLink;
+    // 生成随机数
+    int tempWait = dis(gen);
+    for (auto demandIter = m_vAllNodes[nodeId].m_mRelayVolume.begin(); demandIter != m_vAllNodes[nodeId].m_mRelayVolume.end(); demandIter++)
+    {
+        DEMANDID selectedDemand = demandIter->first;
+        if (m_vAllDemands[selectedDemand].GetArriveTime() > m_dSimTime + SMALLNUM)
+        {
+            continue;
+        }
+        // 根据链路的带宽 bandwidth 和需求的剩余数据量 demandIter->second，计算需求的执行时间，并更新最小执行时间 executeTime
+        NODEID nextNode = m_vAllDemands[selectedDemand].m_Path.m_mNextNode[nodeId];
+        LINKID midLink = m_mNodePairToLink[make_pair(nodeId, nextNode)];
+        RATE bandwidth = m_vAllLinks[midLink].GetBandwidth();
+
+        // 获取该链路上的可用密钥量
+        VOLUME availableKeyVolume = m_vAllLinks[midLink].GetAvaialbeKeys();
+        VOLUME actualTransmittableVolume = min(demandIter->second, availableKeyVolume);
+        TIME demandExecuteTime = actualTransmittableVolume / bandwidth; 
+        if (demandExecuteTime < 3)
+        {
+            if (tempWait == 1)
+            {
+                m_vAllLinks[midLink].wait_or_not = true;
+                continue;
+            }
+        }
+        if (demandExecuteTime < executeTime)
+        {
+
+            if (demandIter->second > availableKeyVolume)
+            {
+                m_vAllLinks[midLink].wait_or_not = true;
+                continue;
+            }
+            else
+            {
+                m_vAllLinks[midLink].wait_or_not = false;
+                executeTime = demandExecuteTime;
+            }
+        }
+        executeTimeDemand[selectedDemand] = demandExecuteTime;
+        if (scheduledDemand.find(midLink) == scheduledDemand.end())
+        {
+            scheduledDemand[midLink] = selectedDemand;
+        }
+        else
+        {
+            DEMANDID preDemand = scheduledDemand[midLink];
+            if (m_vAllNodes[nodeId].m_mRelayVolume[preDemand] > m_vAllNodes[nodeId].m_mRelayVolume[selectedDemand])
+            {
+                scheduledDemand[midLink] = selectedDemand;
+            }
+        }
+
+    }
+    for (auto scheduledIter = scheduledDemand.begin(); scheduledIter != scheduledDemand.end(); scheduledIter++)
+    {
+        RATE bandwidth = m_vAllLinks[scheduledIter->first].GetBandwidth();
+        relayDemands[scheduledIter->second] = bandwidth * executeTime;
+    }
+    return executeTime;
+}
+
+`;
+        document.getElementById('code').value = defaultTemplate;
+    }
+    const apiBaseUrl = "/api/v1";
+    function uploadCode() {
+        const filename = "CustomSchedStrategy.cpp";
+        const code = document.getElementById('code').value;
+
+        if (!filename || !code) {
+            document.getElementById('uploadResult').innerText = '代码内容不能为空。';
+            return;
+        }
+
+        axios.post(`${apiBaseUrl}/sched/upload-code`, {
+            name: filename,
+            code: code
+        })
+        .then(response => {
+            if (response.status === 200) {
+            document.getElementById('uploadResult').innerText = '编译成功：' + response.data;
+            alert('编译成功：' + response.data)
+            } else {
+                document.getElementById('uploadResult').innerText = '编译失败：' + response.data;
+                alert('编译失败：' + response.data)
+            }
+        })
+        .catch(error => {
+            console.error(error);
+            document.getElementById('uploadResult').innerText = '上传失败：' + (error.response?.data?.message || error.message);
+        });
+    }
+</script>
+
+</body>
+</html>

@@ -7,6 +7,7 @@
 #include <memory>
 #include <list>
 #include <set>
+#include <mutex>
 
 class CNetwork;
 
@@ -30,6 +31,10 @@ public:
     void ClearAllStrategies();
     // 注入/重置BGP策略
     void SetBgpStrategy(std::unique_ptr<RouteStrategy> bgp);
+    // 移除某个子域的策略配置和对象
+    void RemoveDomainStrategy(int subdomainId);
+    // 立即应用（重建）某子域的策略对象（强制重建）
+    void ApplyDomainStrategyNow(int subdomainId);
 
     // 主调度接口：自动分流
     bool Route(NODEID sourceId, NODEID sinkId, std::list<NODEID>& nodeList, std::list<LINKID>& linkList);
@@ -41,6 +46,8 @@ private:
     std::unique_ptr<RouteStrategy> bgpStrategy; // BGP对象
     RouteStrategyType defaultStrategy = RouteType_Ospf;
     void ensureDomainStrategy(int subdomainId);
+    // 保护并发访问
+    mutable std::mutex mtx;
 };
 
 } // namespace route

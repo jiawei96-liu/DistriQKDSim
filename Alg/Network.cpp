@@ -1,6 +1,6 @@
 ﻿#include <fstream>
 #include <sstream>
-
+#include "Network.h"
 
 // 从 network_full.csv 读取链路和节点属性，自动补全节点信息
 void CNetwork::LoadNetworkFullCSV(const std::string& filename) {
@@ -66,9 +66,13 @@ void CNetwork::LoadNetworkFullCSV(const std::string& filename) {
 #include <thread>
 #include <vector>
 #include <algorithm> // for std::min
+#include <random>
+#include "Web/dao/SimDao.hpp"
+
 #include <chrono> // 高精度时间
 
-CNetwork::CNetwork(void):simDao()
+
+CNetwork::CNetwork(void):simDao(new SimDao())
 {
     m_dSimTime = 0;
     FaultTime = -1;
@@ -81,7 +85,11 @@ CNetwork::CNetwork(void):simDao()
     // };
     m_routeFactory=make_unique<route::RouteFactory>(this);
 
-    // m_routeStrategy=std::move(m_routeFactory->CreateStrategy(route::RouteType_Bfs));    //BFS
+    m_routeStrategy=std::move(m_routeFactory->CreateStrategy(route::RouteType_Bfs));    //BFS
+
+    m_schedFactory=make_unique<sched::SchedFactory>(this);
+
+    m_schedStrategy=std::move(m_schedFactory->CreateStrategy(sched::SchedType_Min));    //BFS
 
     // m_routeStrategy=std::move(m_routeFactory->CreateStrategy(route::RouteType_KeyRateShortestPath));   //keyrate最短路策略
 
@@ -124,6 +132,10 @@ void CNetwork::Clear()
     // m_routeStrategy=std::move(m_routeFactory->CreateStrategy(route::RouteType_Bfs));    //BFS
 
     m_routeStrategy=std::move(m_routeFactory->CreateStrategy(route::RouteType_KeyRateShortestPath));   //keyrate最短路策略
+
+    m_schedFactory=make_unique<sched::SchedFactory>(this);
+
+    m_schedStrategy=std::move(m_schedFactory->CreateStrategy(sched::SchedType_Min));    //BFS
 
     currentScheduleAlg = [this](NODEID nodeId, map<DEMANDID, VOLUME>& relayDemands) -> TIME
     {
@@ -1142,7 +1154,7 @@ TIME CNetwork::AverageKeyScheduling(NODEID nodeId, map<DEMANDID, VOLUME> &relayD
             }
             // cout<<"该链路存在需求"<<endl;
             num_of_demand++;
-            cout<< link.GetLinkId()<< "have demand" << demandid<<endl;
+            cout<< "平均密钥调度:"<< link.GetLinkId()<< "have demand" << demandid<<endl;
             NODEID nodeid;
             VOLUME relayVolume;
             auto &nextNode = m_vAllDemands[demandid].m_Path.m_mNextNode;
@@ -1242,17 +1254,17 @@ TIME CNetwork::AverageKeyScheduling(NODEID nodeId, map<DEMANDID, VOLUME> &relayD
             link.wait_or_not = true;
             tempTime = (needVolume - availableKeyVolume) / link.GetQKDRate();
         }
-        if (tempTime < 3)
-        {
-            // if (tempWait == 1)
-            // {
-            //     link.wait_or_not = true;
-            //     continue;
-            // }
-            link.wait_or_not = true;
-            executeTime = 3;
-            continue;
-        }
+        // if (tempTime < 3)
+        // {
+        //     // if (tempWait == 1)
+        //     // {
+        //     //     link.wait_or_not = true;
+        //     //     continue;
+        //     // }
+        //     link.wait_or_not = true;
+        //     executeTime = 3;
+        //     continue;
+        // }
         if (tempTime < executeTime)
         {
             executeTime = tempTime;
@@ -1419,14 +1431,10 @@ TIME CNetwork::AverageKeySchedulingLinkBased(LINKID linkId, map<DEMANDID, VOLUME
 
 
 // 为指定节点 nodeId 找到需要转发的需求，并计算所需时间
-// TIME CNetwork::FindDemandToRelay(NODEID nodeId, map<DEMANDID, VOLUME> &relayDemand)
-// {
-//     return currentScheduleAlg(nodeId, relayDemand);
-// }
-
-TIME CNetwork::FindDemandToRelay(LINKID linkId, map<DEMANDID, VOLUME> &relayDemand)
+TIME CNetwork::FindDemandToRelay(NODEID nodeId, map<DEMANDID, VOLUME> &relayDemand)
 {
-    return currentScheduleAlg(linkId, relayDemand);
+    // return currentScheduleAlg(nodeId, relayDemand);
+    return m_schedStrategy->Sched(nodeId,relayDemand);
 }
 
 // 为所有节点找到需要转发的需求，并计算执行时间
@@ -1609,10 +1617,10 @@ TIME CNetwork::FindDemandToRelay(map<NODEID, map<DEMANDID, VOLUME>> &relayDemand
     // 对每个节点，将需求的转发量按最小执行时间比例缩放，并记录在 relayDemand 中
     for (auto nodeIter = nodeRelayDemand.begin(); nodeIter != nodeRelayDemand.end(); nodeIter++)
     {
-        // TIME relayTime = nodeRelayTime[nodeIter->first];
+        TIME relayTime = nodeRelayTime[nodeIter->first];
         for (auto demandIter = nodeIter->second.begin(); demandIter != nodeIter->second.end(); demandIter++)
         {
-            // VOLUME newVolume = demandIter->second * minExecuteTime / relayTime;
+            VOLUME newVolume = demandIter->second * minExecuteTime / relayTime;
             // if (newVolume >= 1)
             // {
             //     relayDemand[nodeIter->first][demandIter->first] = newVolume;
@@ -2109,14 +2117,14 @@ void CNetwork::StoreSimResInDb(){
         }
     }
 
-    // int success=simDao.batchInsertSimulationResults(simID,CurrentStep(),CurrentTime(),res);
+    // int success=simDao->batchInsertSimulationResults(simID,CurrentStep(),CurrentTime(),res);
     SimMetric metric=getCurrentMetric();
     metric.InProgressDemandCount=inProgress;
-    int success=simDao.batchInsertSimulationResultsAndMetric(simID,metric,res);
+    int success=simDao->batchInsertSimulationResultsAndMetric(simID,metric,res);
     if(success!=1){
         cout<<"failed to store sim res"<<endl;
     }
-    success=simDao.setSimStepAndTime(simID,CurrentStep(),CurrentTime());
+    success=simDao->setSimStepAndTime(simID,CurrentStep(),CurrentTime());
     if(success!=1){
         cout<<"failed to setSimStepAndTime"<<endl;
     }
@@ -2165,5 +2173,5 @@ void CNetwork::RunInBackGround(){
         MoveSimTime(executeTime);
         cout << "推进执行时间" << endl;
     }
-    simDao.setSimStatus(simID,"Complete");
+    simDao->setSimStatus(simID,"Complete");
 }

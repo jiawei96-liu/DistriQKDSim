@@ -1,10 +1,10 @@
 ﻿#include "Link.h"
 #include <algorithm>
 
-CLink::CLink(void)
-{
-    wait_or_not = true;
-}
+// CLink::CLink(void)
+// {
+//     wait_or_not = true;
+// }
 
 
 

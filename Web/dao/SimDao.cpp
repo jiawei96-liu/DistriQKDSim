@@ -527,7 +527,7 @@ int SimDao::getAllSims(vector<SimStatusDto>& res){
 
         // 执行查询
         sql::Statement* stmt = newCon->createStatement();
-        sql::ResultSet* resultSet = stmt->executeQuery("SELECT SimID, Name, CreateTime, Status, RouteAlg, ScheduleAlg, CurrentStep, CurrentTime FROM Simulations");
+        sql::ResultSet* resultSet = stmt->executeQuery("SELECT SimID, Name, CreateTime, Status, RouteAlg, ScheduleAlg, CurrentStep, CurrentTime FROM Simulations ORDER BY CreateTime DESC");
 
         while (resultSet->next()) {
             SimStatusDto dto;
@@ -643,4 +643,33 @@ int SimDao::getSimMetric(int simId,int step,SimMetricDto& ret){
         return -1; // 数据库异常
     }
     
+}
+
+int SimDao::setSimRunningStatusToEnd(){
+    try {
+        
+        // 使用PreparedStatement执行SQL语句，更新Status字段
+        sql::PreparedStatement* pstmt = con->prepareStatement(
+            "UPDATE Simulations SET Status = ? WHERE Status = ?"
+        );
+        pstmt->setString(1, "End");  // 设置目标状态
+        pstmt->setString(2, "Running");      // 设置目标SimID
+
+        // 执行更新操作
+        int rowsAffected = pstmt->executeUpdate();
+        delete pstmt;
+
+        // 关闭连接
+
+        if (rowsAffected > 0) {
+            cout << "Successfully updated status " << endl;
+            return 1;  // 更新成功
+        } else {
+            cout << "No running simulation found " << endl;
+            return 1;  // 
+        }
+    } catch (sql::SQLException& e) {
+        cerr << "Error during database operation: " << e.what() << endl;
+        return -1;  // 错误时返回-1
+    }
 }

@@ -10,7 +10,7 @@ class CLink
 public:
     bool wait_or_not;    // 当前节点此时刻应该等待还是传输
     CLink(void);
-    ~CLink(void);
+    ~CLink(void)=default;
     CLink(const CLink& Link);
     void operator=(const CLink& Link);
 

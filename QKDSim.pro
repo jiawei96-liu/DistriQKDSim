@@ -20,6 +20,7 @@ SOURCES += \
     Alg/Route/KeyRateFibStrategy.cpp \
     Alg/Route/KeyRateStrategy.cpp \
     Alg/Route/BfsStrategy.cpp \
+    Alg/Route/CustomRouteStrategy.cpp \
     Alg/Route/RouteFactory.cpp \
     Alg/stdafx.cpp \
     GUI/progressbar.cpp \
@@ -42,6 +43,7 @@ HEADERS += \
     Alg/stdafx.h \
     Alg/targetver.h \
     Alg/Route/BfsStrategy.h \
+    Alg/Route/CustomRouteStrategy.h \
     Alg/Route/RouteFactory.h \
     GUI/progressbar.h \
     GUI/qkdsim.h

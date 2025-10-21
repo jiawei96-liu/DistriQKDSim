@@ -21,13 +21,16 @@ private:
     // 私有构造函数，确保不能外部创建实例
     NetService():simDao() {
         // std::cout << "Singleton Constructor\n";
-        for(int i=0;i<4;i++){
+        for(int i=0;i<9;i++){
             networks.push_back(new CNetwork());
         }
-        for(int i=0;i<4;i++){
+        for(int i=0;i<9;i++){
             sims.push_back(new QKDSim(networks[i]));
         }
         groupId=rand();
+        if(ConfigReader::getStr("role") == "master"){
+            simDao.setSimRunningStatusToEnd();
+        }
     }
 
 public:
@@ -82,7 +85,7 @@ public:
     void Clear();
 
     //返回simID，为0则异常
-    int start(int routeAlg,int scheduleAlg);
+    int start(int routeAlg,int scheduleAlg,bool _begin=false);
 
     bool allStart();
 };

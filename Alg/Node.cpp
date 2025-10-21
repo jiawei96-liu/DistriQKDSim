@@ -1,8 +1,8 @@
 ﻿#include "Node.h"
 
-CNode::CNode(void)
-{
-}
+// CNode::CNode(void)
+// {
+// }
 
 
 
@@ -37,7 +37,7 @@ void CNode::SetNodeId(NODEID nodeId)
     m_uiNodeID = nodeId;
 }
 
-NODEID CNode::GetNodeId()
+NODEID CNode::GetNodeId() const
 {
     return m_uiNodeID;
 }

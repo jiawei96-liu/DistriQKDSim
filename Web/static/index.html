@@ -76,6 +76,9 @@
                     <li class="nav-item">
                         <a class="nav-link" href="/routeCode.html" id="relayPathLink">路由策略</a>
                     </li>
+		    <li class="nav-item">
+                        <a class="nav-link" href="/schedCode.html" id="relayPathLink">调度策略</a>
+                    </li>
                     <li class="nav-item">
                         <a class="nav-link" href="/history.html" id="relayPathLink">历史仿真</a>
                     </li>
@@ -91,6 +94,7 @@
                 <h5 class="card-title mb-0">首页操作</h5>
                 <button id="simStart" class="btn btn-primary ms-3">启动</button>
                 <button id="simReset" class="btn btn-primary ms-3">重置</button>
+                <button id="simAllStart" class="btn btn-primary ms-3">一键启动</button>
             </div>
             <!-- 右侧按钮 -->
             <div class="d-flex ms-auto">
@@ -106,14 +110,20 @@
             <div class="d-flex justify-content-between w-100">
                 <!-- 最短路径优先 -->
                 <div class="form-check form-check-inline w-50">
-                    <input class="form-check-input" type="radio" name="routingAlgorithm" id="shortestPath" value="shortestPath" checked>
+                    <input class="form-check-input" type="radio" name="routingAlgorithm" id="shortestPath" value=0 checked>
                     <label class="form-check-label" for="shortestPath">最短路径优先</label>
                 </div>
                 
                 <!-- 密钥速率优先 -->
                 <div class="form-check form-check-inline w-50">
-                    <input class="form-check-input" type="radio" name="routingAlgorithm" id="keyRate" value="keyRate">
+                    <input class="form-check-input" type="radio" name="routingAlgorithm" id="keyRate" value=1>
                     <label class="form-check-label" for="keyRate">密钥速率优先</label>
+                </div>
+
+                <!-- 密钥速率优先 -->
+                <div class="form-check form-check-inline w-50">
+                    <input class="form-check-input" type="radio" name="routingAlgorithm" id="customRoute" value=2>
+                    <label class="form-check-label" for="customRoute">自定义路由</label>
                 </div>
             </div>
         </div>
@@ -124,14 +134,20 @@
             <div class="d-flex justify-content-between w-100">
                 <!-- 最小任务剩余时间 -->
                 <div class="form-check form-check-inline w-50">
-                    <input class="form-check-input" type="radio" name="schedulingAlgorithm" id="minRemainingTime" value="minRemainingTime" checked>
+                    <input class="form-check-input" type="radio" name="schedulingAlgorithm" id="minRemainingTime" value=0 checked>
                     <label class="form-check-label" for="minRemainingTime">最小任务剩余时间</label>
                 </div>
     
                 <!-- 平均密钥 -->
                 <div class="form-check form-check-inline w-50">
-                    <input class="form-check-input" type="radio" name="schedulingAlgorithm" id="avgKeyRate" value="avgKeyRate">
+                    <input class="form-check-input" type="radio" name="schedulingAlgorithm" id="avgKeyRate" value=1>
                     <label class="form-check-label" for="avgKeyRate">平均密钥</label>
+                </div>
+
+                <!-- 平均密钥 -->
+                <div class="form-check form-check-inline w-50">
+                    <input class="form-check-input" type="radio" name="schedulingAlgorithm" id="customSched" value=2>
+                    <label class="form-check-label" for="avgKeyRate">自定义调度</label>
                 </div>
             </div>
         </div>
@@ -264,18 +280,51 @@
         fetchData()
     });
 
-    //启动
-    document.getElementById('simStart').addEventListener('click', async function() {
+    //一键启动
+    document.getElementById('simAllStart').addEventListener('click', async function() {
         // 获取路由算法选择
-        let routingAlgorithm = document.querySelector('input[name="routingAlgorithm"]:checked').value;
+        let routingAlgorithmParam = document.querySelector('input[name="routingAlgorithm"]:checked').value;
         let schedulingAlgorithm = document.querySelector('input[name="schedulingAlgorithm"]:checked').value;
 
         // 将路由算法和调度算法参数转换为0或1
-        let routingAlgorithmParam = (routingAlgorithm === 'shortestPath') ? 0 : 1;
+        // let routingAlgorithmParam = (routingAlgorithm === 'shortestPath') ? 0 : 1;
         let schedulingAlgorithmParam = (schedulingAlgorithm === 'minRemainingTime') ? 0 : 1;
 
         // 构造请求 URL，使用查询参数传递数据
         const url = `${apiBaseUrl}/sim/allStart?routingAlgorithm=${routingAlgorithmParam}&schedulingAlgorithm=${schedulingAlgorithmParam}`;
+
+        try {
+            // 发起POST请求（使用POST方法，通过查询参数传递）
+            const response = await fetch(url, {
+                method: 'POST'  // 使用GET方法
+            });
+
+            // 检查响应状态码
+            if (response.status === 200) {
+                // const data = await response.json(); // 解析返回的JSON数据（如果需要）
+                // console.log('Success:', data);
+                alert('启动成功');
+            } else {
+                alert('启动失败');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('请求失败');
+        }
+    });
+
+    //单个启动
+    document.getElementById('simStart').addEventListener('click', async function() {
+        // 获取路由算法选择
+        let routingAlgorithmParam = document.querySelector('input[name="routingAlgorithm"]:checked').value;
+        let schedulingAlgorithmParam = document.querySelector('input[name="schedulingAlgorithm"]:checked').value;
+
+        // 将路由算法和调度算法参数转换为0或1
+        // let routingAlgorithmParam = (routingAlgorithm === 'shortestPath') ? 0 : 1;
+        // let schedulingAlgorithmParam = (schedulingAlgorithm === 'minRemainingTime') ? 0 : 1;
+
+        // 构造请求 URL，使用查询参数传递数据
+        const url = `${apiBaseUrl}/sim/oneStart?routingAlgorithm=${routingAlgorithmParam}&schedulingAlgorithm=${schedulingAlgorithmParam}`;
 
         try {
             // 发起POST请求（使用POST方法，通过查询参数传递）
