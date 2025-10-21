@@ -62,6 +62,20 @@ public:
 
     }
 
+    ENDPOINT("POST", "/api/v1/sim/oneStart", simOneStart,QUERY(Int32, routeAlg, "routingAlgorithm"),QUERY(Int32, scheduleAlg, "schedulingAlgorithm")) {
+        //启动
+        OATPP_LOGI("Sim","Start with route alg %d, schedule alg %d",routeAlg.getValue(0),scheduleAlg.getValue(0));
+
+        // bool success=netService->start(routeAlg.getValue(0),scheduleAlg.getValue(0));
+        int simID=netService->start(routeAlg.getValue(0),scheduleAlg.getValue(0),true);
+        if(simID!=0){
+            return createResponse(Status::CODE_200,to_string(simID));
+        }else{
+            return createResponse(Status::CODE_400,"路由或调度策略的参数非法");
+        }
+
+    }
+
     ENDPOINT("POST", "/api/v1/sim/reset", simReset) {
         //重置
         OATPP_LOGI("Sim","Reset");

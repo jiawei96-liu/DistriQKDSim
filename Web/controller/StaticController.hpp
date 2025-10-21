@@ -75,14 +75,43 @@ public:
   ENDPOINT("POST", "api/v1/route/upload-code", uploadRoute, BODY_DTO(Object<CodeDto>, dto),REQUEST(std::shared_ptr<IncomingRequest>, request)) {
         auto fileName=dto->name;
         auto code=dto->code;
+        {
+            oatpp::data::stream::FileOutputStream fileOutputStream(std::string("../Alg/Route/" + fileName.getValue("")).c_str());
+            fileOutputStream.writeSimple(code);
+        }
         
-        oatpp::data::stream::FileOutputStream fileOutputStream(std::string("../Alg/Route/" + fileName.getValue("")).c_str());
-        fileOutputStream.writeSimple(code);
-
+        std::string filePath = "../Alg/Route/" + fileName;
+        std::string soPath = "../Alg/Route/libUserRoute.so";
+        std::string compileCmd = "g++ -std=c++17 -fPIC -shared " + filePath + " -I../ -o " + soPath;
+        std::cout<<"Compile: "<<compileCmd.c_str()<<std::endl;
+        system("ls -l ../Alg/Route/CustomRouteStrategy.cpp");
+        // system("cat ../Alg/Route/CustomRouteStrategy.cpp");
+        if (std::system("g++ -std=c++17 -fPIC -shared ../Alg/Route/CustomRouteStrategy.cpp -I../ -L./Alg -lalg -o ../Alg/Route/libUserRoute.so") != 0) {
+            return createResponse(Status::CODE_500, "编译失败");
+        }
     
         return createResponse(Status::CODE_200, "OK");
     }   
-
+  ENDPOINT("POST", "api/v1/sched/upload-code", uploadSched, BODY_DTO(Object<CodeDto>, dto),REQUEST(std::shared_ptr<IncomingRequest>, request)) {
+        auto fileName=dto->name;
+        auto code=dto->code;
+        {
+            oatpp::data::stream::FileOutputStream fileOutputStream(std::string("../Alg/Sched/" + fileName.getValue("")).c_str());
+            fileOutputStream.writeSimple(code);
+        }
+        
+        std::string filePath = "../Alg/Sched/" + fileName;
+        std::string soPath = "../Alg/Sched/libUserSched.so";
+        std::string compileCmd = "g++ -std=c++17 -fPIC -shared " + filePath + " -I../ -o " + soPath;
+        std::cout<<"Compile: "<<compileCmd.c_str()<<std::endl;
+        system("ls -l ../Alg/Sched/CustomSchedStrategy.cpp");
+        // system("cat ../Alg/Route/CustomRouteStrategy.cpp");
+        if (std::system("g++ -std=c++17 -fPIC -shared ../Alg/Sched/CustomSchedStrategy.cpp -I../ -L./Alg -lalg -o ../Alg/Sched/libUserSched.so") != 0) {
+            return createResponse(Status::CODE_500, "编译失败");
+        }
+    
+        return createResponse(Status::CODE_200, "OK");
+    }
 };
 
 #include OATPP_CODEGEN_END(ApiController) //<- End Codegen

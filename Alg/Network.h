@@ -5,12 +5,14 @@
 #include "Demand.h"
 #include "NetEvent.h"
 #include "Store.hpp"
-#include "Web/dao/SimDao.hpp"
 #include "Alg/Route/RouteFactory.h"
+#include "Alg/Sched/SchedFactory.h"
 //#include "KeyManager.h"
 #include <functional>
 #include <condition_variable>
 #include <mutex>
+
+class SimDao;
 
 class CNetwork
     // 新增：初始化节点和链路（带子域、网关属性）
@@ -48,12 +50,17 @@ private:
     UINT m_uiNodeNum;	// �����еĽڵ�����
     UINT m_uiLinkNum;	// �����е���·����
     UINT m_uiDemandNum;	// �����е���������
+public:
     TIME m_dSimTime;	// ��ǰģ��ʱ��
     UINT m_step;        // ִ�в���
+private:
     std::unique_ptr<route::RouteFactory> m_routeFactory;    //·�ɲ��Թ���
     std::unique_ptr<route::RouteStrategy> m_routeStrategy;  //��ǰ·�ɲ���
+
+    std::unique_ptr<sched::SchedFactory> m_schedFactory;    //·�ɲ��Թ���
+    std::unique_ptr<sched::SchedStrategy> m_schedStrategy;  //��ǰ·�ɲ���
     SimResultStore simResStore;
-    SimDao simDao;
+    SimDao* simDao;
 
 
 public:
@@ -164,10 +171,11 @@ public:
     }
     void setMinimumRemainingTimeFirst()
     {
-        currentScheduleAlg = [this](NODEID nodeId, map<DEMANDID, VOLUME>& relayDemands) -> TIME
-        {
-            return this->MinimumRemainingTimeFirst(nodeId, relayDemands);
-        };
+        m_schedStrategy=std::move(m_schedFactory->CreateStrategy(sched::SchedType_Min));
+        // currentScheduleAlg = [this](NODEID nodeId, map<DEMANDID, VOLUME>& relayDemands) -> TIME
+        // {
+            // return this->MinimumRemainingTimeFirst(nodeId, relayDemands);
+        // };
     }
     void setAverageKeyScheduling()
     {

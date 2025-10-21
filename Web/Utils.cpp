@@ -9,6 +9,12 @@
 #include <sstream>
 #include <ctime>
 
+#include <cstdio>
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <sstream>
+
 oatpp::String StaticFilesManager::getExtension(const oatpp::String& filename) {
   v_int32 dotPos = 0;
   for(v_int32 i = filename->size() - 1; i > 0; i--) {
@@ -82,4 +88,26 @@ std::string getCurrentTimeString() {
     oss << std::put_time(localTime, "%Y-%m-%d %H:%M:%S");  // 精确到秒
 
     return oss.str();
+}
+
+
+std::string execWithOutput(const std::string& cmd) {
+    std::array<char, 256> buffer;
+    std::stringstream result;
+
+    FILE* pipe = popen(cmd.c_str(), "r");
+    if (!pipe) {
+        throw std::runtime_error("popen() 失败");
+    }
+
+    while (fgets(buffer.data(), buffer.size(), pipe) != nullptr) {
+        result << buffer.data();
+    }
+
+    int retCode = pclose(pipe);
+    if (retCode != 0) {
+        result << "\n[编译失败，返回码: " << retCode << "]";
+    }
+
+    return result.str();
 }
