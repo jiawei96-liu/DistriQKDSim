@@ -21,11 +21,11 @@ public:
 
     void loadCSV(const std::string& fileName, Kind kind);
     void readCSV(Kind kind);
+    CNetwork* net;  // CNetwork类的指针
 
 private:
     std::vector<std::tuple<int, int, int, double, double, double, double, double>> network;
     std::vector<std::tuple<int, int, int, double, double>> demand;
-    CNetwork* net;  // CNetwork类的指针
 };
 
 #endif  // QKDSIM_H

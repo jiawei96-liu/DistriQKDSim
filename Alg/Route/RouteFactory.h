@@ -47,6 +47,7 @@ typedef enum {
     RouteType_Bgp,
     RouteType_Custom,
     RouteType_demo,
+    RouteType_MultiDomain,
     RouteType_Unknown
 } RouteStrategyType;
 
@@ -69,6 +70,9 @@ public:
     RouteFactory(CNetwork * net);
     ~RouteFactory();
     std::unique_ptr<RouteStrategy> CreateStrategy(RouteStrategyType type);
+    
+    //load user strategy from .so file
+    std::unique_ptr<RouteStrategy> CreateUserStrategy(std::string soPath);
 };
 
 

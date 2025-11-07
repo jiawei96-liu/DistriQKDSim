@@ -43,6 +43,13 @@ CREATE TABLE SimulationResults (
     IsRouteFailed VARCHAR(16) -- 可选值：YES/NO
 );
 
+CREATE TABLE UserRouteStrategy (
+    ID INT PRIMARY KEY AUTO_INCREMENT,
+    Name VARCHAR(16) NOT NULL ,
+    SoPath VARCHAR(64) NOT NULL,
+    FilePath VARCHAR(64) NOT NULL
+)AUTO_INCREMENT=100;
+
 
 
 /* CREATE TABLE SimResult(

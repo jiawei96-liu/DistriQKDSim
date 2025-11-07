@@ -12,6 +12,7 @@ namespace sched
 typedef enum {
     SchedType_Min,
     SchedType_Avg,
+    SchedType_Reserve,
     SchedType_Custom,
     SchedType_Unknown
 } SchedStrategyType;

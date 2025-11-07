@@ -76,6 +76,7 @@ int SimDao::batchInsertSimulationResults(int simId,int step,double currentTime,v
 
 int SimDao::batchInsertSimulationResultsAndMetric(int simId,SimMetric metric,vector<SimResultStatus> &simRes) {
     if(simRes.size()==0){
+        cout << "[Warning]: No Batch insert!" << endl;
         return 1;
     }
     try {
@@ -671,5 +672,158 @@ int SimDao::setSimRunningStatusToEnd(){
     } catch (sql::SQLException& e) {
         cerr << "Error during database operation: " << e.what() << endl;
         return -1;  // 错误时返回-1
+    }
+}
+
+int SimDao::getAllRouteStrategyInfo(oatpp::Object<ListDto<oatpp::Object<StrategyDto>>> res){
+    try {
+        // 建立数据库连接
+        res->items={};
+        sql::Connection* newCon = driver->connect(host, user, password);
+        newCon->setSchema(database);
+
+        // 执行查询
+        sql::Statement* stmt = newCon->createStatement();
+        sql::ResultSet* resultSet = stmt->executeQuery("SELECT ID, Name, SoPath, FilePath FROM UserRouteStrategy");
+
+        while (resultSet->next()) {
+            auto dto= StrategyDto::createShared() ;
+            dto->id=resultSet->getInt("ID");
+            dto->name = resultSet->getString("Name").asStdString();
+            dto->soPath = resultSet->getString("SoPath").asStdString();
+            dto->filePath=resultSet->getString("FilePath").asStdString();
+            res->items->push_back(dto);
+        }
+        res->count=res->items->size();
+        // 清理资源
+        delete resultSet;
+        delete stmt;
+        delete newCon;
+
+        return 1;
+    } catch (sql::SQLException& e) {
+        cerr << "Error fetching simulations: " << e.what() << endl;
+        return -1;
+    }
+}
+
+
+int SimDao::getStrategyInfoById(int id,oatpp::Object<StrategyDto>& res){
+    try {
+        // 建立数据库连接
+        std::unique_ptr<sql::Connection> newCon(driver->connect(host, user, password));
+        newCon->setSchema(database);
+
+        // 执行查询
+        // sql::Statement* stmt = newCon->createStatement();
+        // sql::ResultSet* resultSet = stmt->executeQuery("SELECT ID, Name, SoPath, FilePath FROM UserRouteStrategy");
+        std::unique_ptr<sql::PreparedStatement> pstmt(
+            newCon->prepareStatement(
+                "SELECT ID, Name, SoPath, FilePath "
+                "FROM UserRouteStrategy WHERE ID = ?"
+            )
+        );
+
+        pstmt->setInt(1, id);
+
+        std::unique_ptr<sql::ResultSet>  resultSet(pstmt->executeQuery());
+        if  (resultSet->next()) {
+            auto dto= StrategyDto::createShared() ;
+            res->id=resultSet->getInt("ID");
+            res->name = resultSet->getString("Name").asStdString();
+            res->soPath = resultSet->getString("SoPath").asStdString();
+            res->filePath=resultSet->getString("FilePath").asStdString();
+        } else{
+            return 0;
+        }
+
+        // 清理资源
+
+        return 1;
+    } catch (sql::SQLException& e) {
+        cerr << "Error fetching simulations: " << e.what() << endl;
+        return -1;
+    }
+}
+
+int SimDao::deleteUserStrategyById(int id){
+    try
+    {
+        std::unique_ptr<sql::Connection> newCon(driver->connect(host, user, password));
+        newCon->setSchema(database);
+
+        // 执行查询
+        std::unique_ptr<sql::PreparedStatement> pstmt(
+            newCon->prepareStatement(
+                "DELETE FROM UserRouteStrategy WHERE ID = ?"
+            )
+        );
+        pstmt->setInt(1, id);
+        pstmt->executeUpdate();
+        return 1;
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+        return -1;
+    }
+    
+}
+
+int SimDao::createUserRouteStrategy(std::string name,std::string soPath,std::string filePath){
+    try
+    {
+        std::unique_ptr<sql::Connection> newCon(driver->connect(host, user, password));
+        newCon->setSchema(database);
+
+        // 执行查询
+        std::unique_ptr<sql::PreparedStatement> pstmt(
+            newCon->prepareStatement(
+                "INSERT INTO UserRouteStrategy (Name,SoPath,FilePath) "
+                "VALUES (?,?, ?)"
+            )
+        );
+        pstmt->setString(1, name);
+        pstmt->setString(2,soPath);
+        pstmt->setString(3,filePath);
+        pstmt->executeUpdate();
+        return 1;
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+        return -1;
+    }
+}
+
+std::string SimDao::getSoPathById(int id){
+    std::string res="";
+    try {
+        // 建立数据库连接
+        std::unique_ptr<sql::Connection> newCon(driver->connect(host, user, password));
+        newCon->setSchema(database);
+
+        // 执行查询
+        // sql::Statement* stmt = newCon->createStatement();
+        // sql::ResultSet* resultSet = stmt->executeQuery("SELECT ID, Name, SoPath, FilePath FROM UserRouteStrategy");
+        std::unique_ptr<sql::PreparedStatement> pstmt(
+            newCon->prepareStatement(
+                "SELECT SoPath "
+                "FROM UserRouteStrategy WHERE ID = ?"
+            )
+        );
+
+        pstmt->setInt(1, id);
+
+        std::unique_ptr<sql::ResultSet>  resultSet(pstmt->executeQuery());
+        if  (resultSet->next()) {
+            res=resultSet->getString("SoPath").asStdString();
+        }
+
+
+        return res;
+    } catch (sql::SQLException& e) {
+        cerr << "Error fetching simulations: " << e.what() << endl;
+        return "";
     }
 }

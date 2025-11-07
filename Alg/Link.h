@@ -4,6 +4,8 @@
 #include "stdafx.h"
 #include "KeyManager.h"
 #include <mutex>
+#include <unordered_map>
+#include <deque>
 
 class CLink
 {
@@ -43,6 +45,12 @@ public:
     std::mutex m_mutex; // 保护链路数据的互斥锁
     std::unordered_set<DEMANDID> m_lCarriedDemands; // 使用 unordered_set 提高查找效率
 
+    // reservation bookkeeping
+    std::unordered_map<DEMANDID, VOLUME> m_reservations; // per-demand reserved volume on this link
+    VOLUME m_totalReserved = 0; // sum of reserved volumes
+    struct WaitingRequest { DEMANDID demandid; VOLUME volume; TIME arriveTime; NODEID originNode; };
+    std::deque<WaitingRequest> m_waitingQueue; // requests waiting for reservation (按到达顺序)
+
     // unordered_set<DEMANDID> m_lCarriedDemands; // 我觉得应该是链路驱动传输，而不是节点驱动传输
 
     void SetLinkId(LINKID linkId);
@@ -76,5 +84,13 @@ public:
     VOLUME GetAvaialbeKeys();	// 获取链路上可用的密钥数量
     void UpdateRemainingKeys(TIME executionTime);	// 根据执行时间更新链路上剩余的密钥量
     void UpdateRemainingKeys(TIME executionTime, TIME m_dSimTime);	// 根据执行时间更新链路上剩余的密钥量
+
+    // reservation APIs (线程安全，内部使用 m_mutex)
+    VOLUME GetAvailableForReservation();
+    bool TryReserve(DEMANDID demandid, VOLUME vol, TIME arriveTime);
+    void CommitReservation(DEMANDID demandid);
+    void ReleaseReservation(DEMANDID demandid);
+    void AddToWaitingQueue(DEMANDID demandid, VOLUME vol, TIME arriveTime, NODEID originNode);
+    const std::deque<WaitingRequest>& GetWaitingQueue() const { return m_waitingQueue; }
 };
 

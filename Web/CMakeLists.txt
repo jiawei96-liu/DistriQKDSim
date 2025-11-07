@@ -4,6 +4,7 @@ set(OATPP_INCLUDE_DIR /usr/local/include/oatpp-1.3.0/oatpp)
 add_executable(webapp
     main.cpp
     svc/NetService.cpp
+    svc/TopologyConfigService.cpp
     dao/SimDao.cpp
     Utils.cpp
 )

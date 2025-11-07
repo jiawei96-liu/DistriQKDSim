@@ -111,3 +111,29 @@ std::string execWithOutput(const std::string& cmd) {
 
     return result.str();
 }
+
+std::string percentDecode(const oatpp::String& s) {
+  std::string out;
+  out.reserve(s ? s->size() : 0);
+  for (size_t i = 0; s && i < s->size(); ++i) {
+    unsigned char c = static_cast<unsigned char>((*s)[i]);
+    if (c == '%') {
+      if (i + 2 < s->size() &&
+          std::isxdigit(static_cast<unsigned char>((*s)[i+1])) &&
+          std::isxdigit(static_cast<unsigned char>((*s)[i+2]))) {
+        auto hex = std::string{s->c_str() + i + 1, 2};
+        char decoded = static_cast<char>(std::strtol(hex.c_str(), nullptr, 16));
+        out.push_back(decoded);
+        i += 2;
+      } else {
+        // 非法的 % 序列，原样保留或直接报错都行；这里选择原样保留
+        out.push_back(c);
+      }
+    } else if (c == '+') {
+      out.push_back(' ');
+    } else {
+      out.push_back(static_cast<char>(c));
+    }
+  }
+  return out;
+}

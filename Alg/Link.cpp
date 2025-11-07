@@ -184,4 +184,57 @@ void CLink::UpdateRemainingKeys(TIME executionTime, TIME m_dSimTime)
     // }
 }
 
+// reservation APIs
+VOLUME CLink::GetAvailableForReservation()
+{
+    std::lock_guard<std::mutex> lk(m_mutex);
+    VOLUME avail = m_KeyManager.GetAvailableKeys();
+    if (avail <= m_totalReserved) return 0;
+    return avail - m_totalReserved;
+}
+
+bool CLink::TryReserve(DEMANDID demandid, VOLUME vol, TIME arriveTime)
+{
+    std::lock_guard<std::mutex> lk(m_mutex);
+    VOLUME avail = m_KeyManager.GetAvailableKeys();
+    VOLUME availForRes = 0;
+    if (avail > m_totalReserved) availForRes = avail - m_totalReserved;
+    if (availForRes >= vol) {
+        m_reservations[demandid] += vol;
+        m_totalReserved += vol;
+        return true;
+    }
+    return false;
+}
+
+void CLink::CommitReservation(DEMANDID demandid)
+{
+    std::lock_guard<std::mutex> lk(m_mutex);
+    auto it = m_reservations.find(demandid);
+    if (it == m_reservations.end()) return;
+    VOLUME vol = it->second;
+    // consume actual keys from key manager
+    m_KeyManager.ConsumeKeys(vol);
+    // adjust reserved accounting and erase
+    if (m_totalReserved >= vol) m_totalReserved -= vol; else m_totalReserved = 0;
+    m_reservations.erase(it);
+}
+
+void CLink::ReleaseReservation(DEMANDID demandid)
+{
+    std::lock_guard<std::mutex> lk(m_mutex);
+    auto it = m_reservations.find(demandid);
+    if (it == m_reservations.end()) return;
+    VOLUME vol = it->second;
+    if (m_totalReserved >= vol) m_totalReserved -= vol; else m_totalReserved = 0;
+    m_reservations.erase(it);
+}
+
+void CLink::AddToWaitingQueue(DEMANDID demandid, VOLUME vol, TIME arriveTime, NODEID originNode)
+{
+    std::lock_guard<std::mutex> lk(m_mutex);
+    WaitingRequest req{demandid, vol, arriveTime, originNode};
+    m_waitingQueue.push_back(req);
+}
+
 

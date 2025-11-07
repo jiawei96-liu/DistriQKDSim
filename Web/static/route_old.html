@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>路由策略</title>
+    <link href="/bootstrap.min.css" rel="stylesheet">
+    <script src="/axios.min.js"></script>
+    <style>
+        .editor-container {
+            margin-top: 20px;
+        }
+        .code-editor {
+            width: 100%;
+            height: 400px;
+            font-family: monospace;
+            font-size: 14px;
+            padding: 10px;
+            border: 1px solid #ced4da;
+            border-radius: 5px;
+            background-color: #f8f9fa;
+            resize: vertical;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">路由策略</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/" id="inputInfoLink">输入信息</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/sim.html" id="simulationResultLink">仿真结果</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" id="relayPathLink">路由策略</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/schedCode.html" id="simulationResultLink">调度策略</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/history.html" id="simulationResultLink">历史仿真</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="editor-container">
+        <div class="mb-3">
+            <label for="filename" class="form-label">CustomRouteStrategy.cpp</label>
+            <!-- <input type="text" class="form-control" id="filename" placeholder="例如：CustomRouteStrategy.cpp"> -->
+        </div>
+        <div class="mb-3">
+            <label for="code" class="form-label">代码内容</label>
+            <textarea class="code-editor" id="code" placeholder="# 在这里编写你的代码..."></textarea>
+        </div>
+        <button class="btn btn-success" onclick="uploadCode()">上传代码</button>
+        <div id="uploadResult" class="mt-3"></div>
+    </div>
+</div>
+
+<script>
+
+window.onload = () => {
+    const defaultTemplate = `#include "CustomRouteStrategy.h"
+#include "Alg/Network.h"
+
+using namespace route;
+extern "C" route::CustomRouteStrategy* createRouteStrategy(CNetwork* net) {
+    return new route::CustomRouteStrategy(net);
+}
+bool CustomRouteStrategy::Route(NODEID sourceId, NODEID sinkId, std::list<NODEID>& nodeList, std::list<LINKID>& linkList) {
+    // 自定义路由算法实现
+    // 获取网络中节点的总数
+    UINT NodeNum = static_cast<UINT>(net->m_vAllNodes.size());
+
+    // 用于记录每个节点在最短路径中的前驱节点，初始化为 -1
+    vector<NODEID> preNode(NodeNum, -1);
+
+    // 用于记录每个节点是否已被访问，初始化为 false
+    vector<bool> visited(NodeNum, false);
+
+    // 队列用于进行广度优先搜索（BFS）
+    queue<NODEID> toVisit;
+
+    // 将源节点加入待访问队列并标记为已访问
+    toVisit.push(sourceId);
+    visited[sourceId] = true;
+
+    // 开始进行 BFS 搜索
+    while (!toVisit.empty())
+    {
+        // 取出队首元素作为当前节点
+        NODEID curNode = toVisit.front();
+        toVisit.pop();
+
+        // 如果当前节点是目标节点，则跳出循环
+        if (curNode == sinkId)
+        {
+            break;
+        }
+
+        // 遍历当前节点的所有邻接节点
+        for (auto adjNodeIter = net->m_vAllNodes[curNode].m_lAdjNodes.begin();
+                adjNodeIter != net->m_vAllNodes[curNode].m_lAdjNodes.end();
+                adjNodeIter++)
+        {
+            NODEID adjNode = *adjNodeIter;  // 获取邻接节点 ID
+
+            // 获取边的 ID
+            LINKID linkId = net->m_mNodePairToLink[make_pair(curNode, adjNode)];
+
+            // 检查边的权重是否为无穷大
+            if (net->m_vAllLinks[linkId].GetWeight() == INF)
+            {
+                continue; // 跳过权重为无穷大的边
+            }
+
+            // 如果邻接节点未被访问过
+            if (!visited[adjNode])
+            {
+                // 标记邻接节点为已访问
+                visited[adjNode] = true;
+
+                // 更新邻接节点的前驱节点为当前节点
+                preNode[adjNode] = curNode;
+
+                // 将邻接节点加入待访问队列
+                toVisit.push(adjNode);
+
+                // 如果邻接节点是目标节点，则跳出内层循环
+                if (adjNode == sinkId)
+                {
+                    break;
+                }
+            }
+        }
+    }
+
+    // 如果目标节点没有被访问过，说明不存在从 sourceId 到 sinkId 的路径
+    if (!visited[sinkId])
+    {
+        return false;
+    }
+
+    // 从目标节点开始回溯路径，直到源节点
+    NODEID curNode = sinkId;
+    while (curNode != sourceId)
+    {
+        // 将当前节点加入路径列表（头部）
+        nodeList.push_front(curNode);
+
+        // 获取当前节点的前驱节点
+        NODEID pre = preNode[curNode];
+
+        // 获取前驱节点到当前节点的边 ID，并加入边列表（头部）
+        LINKID midLink = net->m_mNodePairToLink[make_pair(pre, curNode)];
+        linkList.push_front(midLink);
+
+        // 移动到前驱节点
+        curNode = pre;
+    }
+
+    // 将源节点加入路径列表（头部）
+    nodeList.push_front(sourceId);
+
+    // 返回 true 表示找到了路径
+    return true;
+}`;
+        document.getElementById('code').value = defaultTemplate;
+    }
+    const apiBaseUrl = "/api/v1";
+    function uploadCode() {
+        const filename = "CustomRouteStrategy.cpp";
+        const code = document.getElementById('code').value;
+
+        if (!filename || !code) {
+            document.getElementById('uploadResult').innerText = '代码内容不能为空。';
+            return;
+        }
+
+        axios.post(`${apiBaseUrl}/route/upload-code`, {
+            name: filename,
+            code: code
+        })
+        .then(response => {
+            if (response.status === 200) {
+            document.getElementById('uploadResult').innerText = '编译成功：' + response.data;
+            alert('编译成功：' + response.data)
+            } else {
+                document.getElementById('uploadResult').innerText = '编译失败：' + response.data;
+                alert('编译失败：' + response.data)
+            }
+        })
+        .catch(error => {
+            console.error(error);
+            document.getElementById('uploadResult').innerText = '上传失败：' + (error.response?.data?.message || error.message);
+        });
+    }
+</script>
+
+</body>
+</html>

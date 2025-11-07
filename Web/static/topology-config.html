@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>网络拓扑配置</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/bootstrap.min.css" rel="stylesheet"/>
+  <style>
+    body { background-color: #f5f5f5; }
+    .container { width: 100%; margin: 0 auto;
+            padding: 20px;}
+    .subdomain-card + .subdomain-card { margin-top: 12px; }
+    .subdomain-title { font-weight: 600; }
+    .editor-wrap {
+      background: #fff; border: 1px solid #e5e7eb; border-radius: 8px;
+      padding: 12px; height: 420px;
+    }
+    .editor-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+    .canvas-wrap { position: relative; height: 340px; border: 1px dashed #cbd5e1; border-radius: 8px; background: #fafafa; }
+    svg#graph {
+      width: 100%; height: 100%; user-select: none; cursor: default;
+    }
+    .node {
+      fill: #e0f2fe; stroke: #0284c7; stroke-width: 2px; cursor: move;
+      transition: filter .1s ease;
+    }
+    .node.selected { filter: drop-shadow(0 0 4px rgba(2,132,199,0.7)); }
+    .node-label { font-size: 12px; fill: #0f172a; pointer-events: none; }
+    .edge { stroke: #64748b; stroke-width: 2px; marker-end: url(#arrow); }
+    .edge.cross { stroke: #ef4444; }
+    .edge-handle {
+      fill: #fff; stroke: #94a3b8; stroke-width: 1.5px; r: 11px; cursor: pointer;
+    }
+    .edge-label {
+      font-size: 12px; fill: #1f2937; background: white; pointer-events: none;
+    }
+    .matrix-table input::-webkit-outer-spin-button,
+    .matrix-table input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .matrix-table input[type=number] { -moz-appearance: textfield; }
+    .muted { color: #6b7280; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <div class="container py-4">
+    <!-- 顶部导航（可按需保留你的原导航） -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4 rounded">
+      <div class="container-fluid">
+        <a class="navbar-brand" href="/index.html">量子网络仿真器</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+          aria-controls="navbarNav" aria-expanded="false" aria-label="切换导航">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav ms-auto">
+            <li class="nav-item"><a class="nav-link" href="/index.html">首页</a></li>
+            <li class="nav-item"><a class="nav-link active" aria-current="page" href="/topology-config.html">网络拓扑</a></li>
+            <li class="nav-item"><a class="nav-link" href="/sim.html">仿真</a></li>
+            <li class="nav-item"><a class="nav-link" href="/routeCode.html">路由策略</a></li>
+            <li class="nav-item"><a class="nav-link" href="/schedCode.html">调度策略</a></li>
+            <li class="nav-item"><a class="nav-link" href="/history.html">仿真历史</a></li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <div id="statusAlert" class="alert d-none" role="alert"></div>
+
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h4 class="card-title mb-3">网络拓扑配置</h4>
+        <p class="text-muted mb-3">输入拓扑文件名，配置最多四个子域的节点/边数；在画布上连线并设置域间连接数，然后点击“生成拓扑”。</p>
+
+        <!-- 基本参数 -->
+        <div class="row g-3 mb-3">
+          <div class="col-sm-6 col-md-4">
+            <label class="form-label">拓扑文件名</label>
+            <input type="text" class="form-control" id="filenameInput" placeholder="如：network_A.csv">
+            <div class="form-text">建议以 .csv 结尾，后端将保存到 out_dir。</div>
+          </div>
+          <div class="col-sm-6 col-md-2">
+            <label class="form-label">子域数量</label>
+            <div class="input-group">
+              <input type="number" min="1" max="4" step="1" class="form-control" id="subdomainCount" value="2">
+              <button class="btn btn-outline-secondary" type="button" id="applySubdomainCount">应用</button>
+            </div>
+          </div>
+          <div class="col-md-6 col-lg-6">
+    <label class="form-label">参数</label>
+    <div class="d-flex flex-wrap gap-2">
+
+      <!-- seed -->
+      <div class="input-group input-group-sm" style="max-width: 220px;">
+        <span class="input-group-text">
+          seed
+          <i class="ms-1 bi bi-info-circle" data-bs-toggle="tooltip"
+            title="随机种子：控制生成的可复现性。"></i>
+        </span>
+        <input class="form-control" id="seedInput" type="number" value="42" aria-label="随机种子">
+      </div>
+
+      <!-- num_pairs -->
+      <div class="input-group input-group-sm" style="max-width: 250px;">
+        <span class="input-group-text">
+          num_pairs
+          <i class="ms-1 bi bi-info-circle" data-bs-toggle="tooltip"
+            title="需求对数量：生成的(source,dest)对的条数。"></i>
+        </span>
+        <input class="form-control" id="pairsInput" type="number" value="4000" aria-label="需求对数量">
+      </div>
+
+      <!-- intra_pair_ratio -->
+      <div class="input-group input-group-sm" style="max-width: 280px;">
+        <span class="input-group-text">
+          intra_ratio
+          <i class="ms-1 bi bi-info-circle" data-bs-toggle="tooltip"
+            title="同域比例：生成的需求对中，落在同一子域内的比例(0~1)。"></i>
+        </span>
+        <input class="form-control" id="intraRatioInput" type="number" min="0" max="1" step="0.1" value="0.8" aria-label="同域比例">
+      </div>
+
+      <!-- max_pair_hops -->
+      <div class="input-group input-group-sm" style="max-width: 260px;">
+        <span class="input-group-text">
+          max_hops
+          <i class="ms-1 bi bi-info-circle" data-bs-toggle="tooltip"
+            title="demand最短路跳数上限：只生成最短路径跳数≤该值的节点demand对。"></i>
+        </span>
+        <input class="form-control" id="maxHopsInput" type="number" value="8" aria-label="最短路跳数上限">
+      </div>
+
+      <!-- plot_limit -->
+      <!-- <div class="input-group input-group-sm" style="max-width: 250px;">
+        <span class="input-group-text">
+          plot_limit
+          <i class="ms-1 bi bi-info-circle" data-bs-toggle="tooltip"
+            title="绘图阈值：节点总数≤该值才生成拓扑图文件。"></i>
+        </span>
+        <input class="form-control" id="plotLimitInput" type="number" value="1000" aria-label="绘图阈值">
+      </div> -->
+
+      <!-- out_dir -->
+      <!-- <div class="input-group input-group-sm" style="max-width: 260px;">
+        <span class="input-group-text">
+          out_dir
+          <i class="ms-1 bi bi-info-circle" data-bs-toggle="tooltip"
+            title="输出目录：network.csv / demand.csv 的保存路径。"></i>
+        </span>
+        <input class="form-control" id="outDirInput" type="text" value="data" aria-label="输出目录">
+      </div> -->
+
+    </div>
+  </div>
+
+        </div>
+
+        <!-- 子域表单 -->
+        <div id="subdomainsContainer" class="row g-3"></div>
+
+        <!-- 交互式连线编辑器 + 矩阵编辑 -->
+        <div class="row g-3 mt-1">
+          <div class="col-lg-7">
+            <div class="editor-wrap">
+              <div class="editor-toolbar">
+                <div class="btn-group" role="group">
+                  <button class="btn btn-sm btn-outline-primary active" id="selectModeBtn">选择/拖拽</button>
+                  <button class="btn btn-sm btn-outline-primary" id="connectModeBtn">连线模式</button>
+                </div>
+                <span class="muted">提示：连线模式下，点击源域再点击目标域，将弹出设置连接数的输入框；拖拽圆点可调整布局。</span>
+              </div>
+              <div class="canvas-wrap">
+                <svg id="graph">
+                  <defs>
+                    <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5"
+                            markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                      <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8"></path>
+                    </marker>
+                  </defs>
+                </svg>
+              </div>
+            </div>
+          </div>
+          <div class="col-lg-5">
+            <div class="card">
+              <div class="card-body">
+                <h6 class="card-title mb-2">域间连接矩阵</h6>
+                <p class="muted mb-2">与画布联动；可直接修改数字（对称写入）。</p>
+                <div id="matrixContainer" class="matrix-table"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div class="d-flex flex-wrap gap-2 mt-3">
+          <button class="btn btn-primary" id="generateBtn">生成拓扑</button>
+          <button class="btn btn-outline-secondary" id="resetBtn">重置表单</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ---- 配置 ----
+    const GENERATE_ENDPOINT = '/api/v1/topology/generate';
+
+    // ---- 状态 ----
+    let state = {
+      count: 2,
+      domains: [
+        { nodes: 1200, edges: 5000 },
+        { nodes: 800, edges: 2000 },
+      ],
+      inter: [
+        [0, 30],
+        [30, 0],
+      ],
+      mode: 'select',   // 'select' | 'connect'
+      pendingSource: null, // 连线模式下选择的源域 index
+    };
+
+    // ---- DOM 引用 ----
+    const statusAlert = document.getElementById('statusAlert');
+    const subdomainCountInput = document.getElementById('subdomainCount');
+    const applySubdomainCountBtn = document.getElementById('applySubdomainCount');
+    const subdomainsContainer = document.getElementById('subdomainsContainer');
+
+    const filenameInput = document.getElementById('filenameInput');
+    const seedInput = document.getElementById('seedInput');
+    const pairsInput = document.getElementById('pairsInput');
+    const intraRatioInput = document.getElementById('intraRatioInput');
+    const maxHopsInput = document.getElementById('maxHopsInput');
+    const plotLimitInput = document.getElementById('plotLimitInput');
+    const outDirInput = document.getElementById('outDirInput');
+
+    const selectModeBtn = document.getElementById('selectModeBtn');
+    const connectModeBtn = document.getElementById('connectModeBtn');
+    const matrixContainer = document.getElementById('matrixContainer');
+    const generateBtn = document.getElementById('generateBtn');
+    const resetBtn = document.getElementById('resetBtn');
+
+    const svg = document.getElementById('graph');
+
+    // ---- 工具函数 ----
+    function showStatus(msg, type='info') {
+      statusAlert.textContent = msg;
+      statusAlert.className = `alert alert-${type}`;
+    }
+    function hideStatus() {
+      statusAlert.textContent = '';
+      statusAlert.className = 'alert d-none';
+    }
+    function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
+
+    // ---- 初始化/渲染 ----
+    function ensureState() {
+      state.count = clamp(parseInt(subdomainCountInput.value || '0', 10) || 0, 1, 4);
+      if (!Array.isArray(state.domains)) state.domains = [];
+      while (state.domains.length < state.count) state.domains.push({ nodes: 0, edges: 0 });
+      while (state.domains.length > state.count) state.domains.pop();
+
+      if (!Array.isArray(state.inter)) state.inter = [];
+      // 扩/裁 inter 矩阵
+      for (let i = 0; i < state.count; i++) {
+        if (!Array.isArray(state.inter[i])) state.inter[i] = [];
+        for (let j = 0; j < state.count; j++) {
+          if (i === j) { state.inter[i][j] = 0; }
+          else if (state.inter[i][j] == null) { state.inter[i][j] = 0; }
+        }
+        state.inter[i].length = state.count;
+      }
+      state.inter.length = state.count;
+    }
+
+    function renderDomainCards() {
+      subdomainsContainer.innerHTML = '';
+      for (let i = 0; i < state.count; i++) {
+        const d = state.domains[i];
+        const col = document.createElement('div');
+        col.className = 'col-6 col-md-4 col-lg-3'; // ≥lg 一行4个卡
+        col.innerHTML = `
+          <div class="card subdomain-card h-100">
+            <div class="card-body p-2">
+              <div class="d-flex flex-column gap-2">
+                <div class="subdomain-title small">子域 #${i+1}</div>
+                <!-- 一行内两个输入 -->
+                <div class="d-flex align-items-center gap-2">
+                  <div class="input-group input-group-sm" style="width: 150px;">
+                    <span class="input-group-text">节点数</span>
+                    <input type="number" min="0" step="1"
+                          class="form-control node-count-input"
+                          data-idx="${i}" value="${Number(d.nodes)||0}">
+                  </div>
+                  <div class="input-group input-group-sm" style="width: 170px;">
+                    <span class="input-group-text">域内边数</span>
+                    <input type="number" min="0" step="1"
+                          class="form-control edge-count-input"
+                          data-idx="${i}" value="${Number(d.edges)||0}">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+
+
+        subdomainsContainer.appendChild(col);
+      }
+      // 绑定输入事件
+      subdomainsContainer.querySelectorAll('.node-count-input').forEach(inp=>{
+        inp.addEventListener('change', e=>{
+          const i = Number(e.target.dataset.idx);
+          state.domains[i].nodes = Math.max(0, parseInt(e.target.value||'0',10)||0);
+          draw();
+          renderMatrix();
+        });
+      });
+      subdomainsContainer.querySelectorAll('.edge-count-input').forEach(inp=>{
+        inp.addEventListener('change', e=>{
+          const i = Number(e.target.dataset.idx);
+          state.domains[i].edges = Math.max(0, parseInt(e.target.value||'0',10)||0);
+          draw();
+        });
+      });
+    }
+
+    function renderMatrix() {
+      const n = state.count;
+      const table = document.createElement('table');
+      table.className = 'table table-sm table-bordered align-middle';
+      const thead = document.createElement('thead');
+      const trh = document.createElement('tr');
+      trh.innerHTML = `<th class="text-center">#</th>` + Array.from({length:n},(_,j)=>`<th class="text-center">域${j+1}</th>`).join('');
+      thead.appendChild(trh);
+      table.appendChild(thead);
+
+      const tbody = document.createElement('tbody');
+      for (let i=0;i<n;i++){
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<th class="text-center">域${i+1}</th>`;
+        for (let j=0;j<n;j++){
+          const val = state.inter[i][j]||0;
+          const td = document.createElement('td');
+          if (i===j){
+            td.className='text-center text-muted';
+            td.textContent='0';
+          } else {
+            td.innerHTML = `<input type="number" min="0" step="1" class="form-control form-control-sm" data-i="${i}" data-j="${j}" value="${val}">`;
+          }
+          tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+      }
+      table.appendChild(tbody);
+      matrixContainer.innerHTML = '';
+      matrixContainer.appendChild(table);
+
+      matrixContainer.querySelectorAll('input[type="number"]').forEach(inp=>{
+        inp.addEventListener('change', e=>{
+          const i = Number(e.target.dataset.i);
+          const j = Number(e.target.dataset.j);
+          const v = Math.max(0, parseInt(e.target.value||'0',10)||0);
+          state.inter[i][j] = v;
+          state.inter[j][i] = v; // 对称
+          draw();
+          renderMatrix(); // 重新渲染以同步对称单元格
+        });
+      });
+    }
+
+    // ---- SVG 交互式编辑器 ----
+    // 简单布局：初始把最多4个域放在画布四角附近，可拖拽
+    let nodesPos = []; // [{x,y}, ...]
+    function initNodePositions() {
+      nodesPos = [];
+      const { width, height } = svg.getBoundingClientRect();
+      const padX = 80, padY = 60;
+      const xs = [padX, width-padX, padX, width-padX];
+      const ys = [padY, padY, height-padY, height-padY];
+      for (let i=0;i<state.count;i++){
+        nodesPos.push({ x: xs[i] ?? (padX + i*120), y: ys[i] ?? (padY + i*80) });
+      }
+    }
+
+    function draw() {
+      const n = state.count;
+      // 清空
+      while (svg.firstChild) svg.removeChild(svg.firstChild);
+      // defs（箭头）
+      const defs = document.createElementNS('http://www.w3.org/2000/svg','defs');
+      defs.innerHTML = `
+        <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5"
+          markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8"></path>
+        </marker>
+      `;
+      svg.appendChild(defs);
+
+      // 画边 (无向，使用双向箭头外观只是装饰)
+      for (let i=0;i<n;i++){
+        for (let j=i+1;j<n;j++){
+          const count = state.inter[i][j]||0;
+          if (count<=0) continue;
+          const p1 = nodesPos[i], p2 = nodesPos[j];
+          const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+          line.setAttribute('x1', p1.x); line.setAttribute('y1', p1.y);
+          line.setAttribute('x2', p2.x); line.setAttribute('y2', p2.y);
+          line.setAttribute('class', 'edge cross');
+          svg.appendChild(line);
+
+          // 中点的“可点小圆”作为编辑把手
+          const mx = (p1.x + p2.x)/2, my=(p1.y + p2.y)/2;
+          const handle = document.createElementNS('http://www.w3.org/2000/svg','circle');
+          handle.setAttribute('cx', mx); handle.setAttribute('cy', my);
+          handle.setAttribute('r', 11);
+          handle.setAttribute('class','edge-handle');
+          handle.addEventListener('click', ()=>{
+            const newVal = prompt(`设置 域${i+1} ↔ 域${j+1} 的连接数`, String(count));
+            if (newVal == null) return;
+            const v = Math.max(0, parseInt(newVal,10)||0);
+            state.inter[i][j]=v; state.inter[j][i]=v;
+            draw(); renderMatrix();
+          });
+          svg.appendChild(handle);
+
+          // 数字标签
+          const label = document.createElementNS('http://www.w3.org/2000/svg','text');
+          label.setAttribute('x', mx); label.setAttribute('y', my+4);
+          label.setAttribute('text-anchor','middle');
+          label.setAttribute('class','edge-label');
+          label.textContent = count;
+          svg.appendChild(label);
+        }
+      }
+
+      // 画节点
+      for (let i=0;i<n;i++){
+        const p = nodesPos[i];
+        const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+        g.setAttribute('data-idx', i);
+
+        const circle = document.createElementNS('http://www.w3.org/2000/svg','circle');
+        circle.setAttribute('cx', p.x); circle.setAttribute('cy', p.y);
+        circle.setAttribute('r', 22);
+        circle.setAttribute('class', 'node');
+        g.appendChild(circle);
+
+        const text = document.createElementNS('http://www.w3.org/2000/svg','text');
+        text.setAttribute('x', p.x); text.setAttribute('y', p.y+4);
+        text.setAttribute('text-anchor','middle');
+        text.setAttribute('class','node-label');
+        const d = state.domains[i];
+        text.textContent = `域${i+1} (${d.nodes}|${d.edges})`;
+        g.appendChild(text);
+
+        // 交互：选择/连线/拖拽
+        g.addEventListener('click', (e)=>{
+          if (state.mode === 'connect') {
+            if (state.pendingSource == null) {
+              state.pendingSource = i;
+              circle.classList.add('selected');
+            } else if (state.pendingSource === i) {
+              // 取消
+              state.pendingSource = null;
+              circle.classList.remove('selected');
+            } else {
+              // 连线
+              const s = state.pendingSource, t = i;
+              const current = state.inter[s][t]||0;
+              const val = prompt(`设置 域${Math.min(s,t)+1} ↔ 域${Math.max(s,t)+1} 的连接数`, String(current));
+              if (val != null) {
+                const v = Math.max(0, parseInt(val,10)||0);
+                state.inter[s][t]=v; state.inter[t][s]=v;
+                draw(); renderMatrix();
+              }
+              // 清理状态
+              const allCircles = svg.querySelectorAll('.node.selected');
+              allCircles.forEach(c=>c.classList.remove('selected'));
+              state.pendingSource = null;
+            }
+          }
+        });
+
+        // 拖拽
+        let dragging = false, offsetX=0, offsetY=0;
+        g.addEventListener('mousedown', (e)=>{
+          if (state.mode !== 'select') return;
+          dragging = true;
+          const pt = svg.createSVGPoint();
+          pt.x = e.clientX; pt.y = e.clientY;
+          const ctm = svg.getScreenCTM().inverse();
+          const sp = pt.matrixTransform(ctm);
+          offsetX = sp.x - p.x;
+          offsetY = sp.y - p.y;
+        });
+        window.addEventListener('mousemove', (e)=>{
+          if (!dragging) return;
+          const pt = svg.createSVGPoint();
+          pt.x = e.clientX; pt.y = e.clientY;
+          const ctm = svg.getScreenCTM().inverse();
+          const sp = pt.matrixTransform(ctm);
+          p.x = sp.x - offsetX;
+          p.y = sp.y - offsetY;
+          draw();
+        });
+        window.addEventListener('mouseup', ()=> dragging=false);
+
+        svg.appendChild(g);
+      }
+    }
+
+    // ---- 事件绑定 ----
+    subdomainCountInput.addEventListener('change', ()=>{
+      subdomainCountInput.value = clamp(parseInt(subdomainCountInput.value||'0',10)||0, 1, 4);
+      ensureState();
+      renderDomainCards();
+      initNodePositions();
+      draw();
+      renderMatrix();
+    });
+    applySubdomainCountBtn.addEventListener('click', ()=>{
+      ensureState();
+      renderDomainCards();
+      initNodePositions();
+      draw();
+      renderMatrix();
+    });
+
+    selectModeBtn.addEventListener('click', ()=>{
+      state.mode = 'select';
+      selectModeBtn.classList.add('active');
+      connectModeBtn.classList.remove('active');
+      const allCircles = svg.querySelectorAll('.node.selected');
+      allCircles.forEach(c=>c.classList.remove('selected'));
+      state.pendingSource = null;
+    });
+    connectModeBtn.addEventListener('click', ()=>{
+      state.mode = 'connect';
+      connectModeBtn.classList.add('active');
+      selectModeBtn.classList.remove('active');
+    });
+
+    resetBtn.addEventListener('click', ()=>{
+      hideStatus();
+      state = {
+        count: 2,
+        domains: [
+          { nodes: 1200, edges: 5000 },
+          { nodes: 800, edges: 2000 },
+        ],
+        inter: [
+          [0, 30],
+          [30, 0],
+        ],
+        mode: 'select',
+        pendingSource: null,
+      };
+      subdomainCountInput.value = 2;
+      filenameInput.value = '';
+      seedInput.value = 42;
+      pairsInput.value = 4000;
+      intraRatioInput.value = 0.8;
+      maxHopsInput.value = 8;
+      plotLimitInput.value = 1000;
+      outDirInput.value = 'data';
+
+      ensureState();
+      renderDomainCards();
+      initNodePositions();
+      draw();
+      renderMatrix();
+      showStatus('已重置为示例配置。', 'secondary');
+    });
+
+    generateBtn.addEventListener('click', async ()=>{
+      hideStatus();
+      const filename = (filenameInput.value || '').trim();
+      if (!filename) {
+        showStatus('请填写拓扑文件名。', 'warning');
+        return;
+      }
+      // 读取表单为 state
+      ensureState();
+      // 校验域配置
+      for (let i=0;i<state.count;i++){
+        const d = state.domains[i];
+        const maxEdges = d.nodes * (d.nodes - 1) / 2;
+        if (d.edges > maxEdges) {
+          showStatus(`域${i+1} 的域内边数超过上限(${maxEdges})。`, 'danger');
+          return;
+        }
+      }
+
+      const payload = {
+        filename,
+        domains: state.domains.map(d=>({ nodes: Number(d.nodes)||0, edges: Number(d.edges)||0 })),
+        inter_edges: state.inter.map(row=> row.map(v=> Number(v)||0 )),
+        seed: Number(seedInput.value)||42,
+        num_pairs: Number(pairsInput.value)||0,
+        intra_pair_ratio: Math.max(0, Math.min(1, Number(intraRatioInput.value)||0)),
+        max_pair_hops: Number(maxHopsInput.value)||8
+        // plot_limit: Number(plotLimitInput.value)||1000,
+        // out_dir: (outDirInput.value||'data')
+      };
+
+      try {
+        const resp = await fetch(GENERATE_ENDPOINT, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(payload)
+        });
+        if (!resp.ok) {
+          const txt = await resp.text();
+          // 失败时尽量解析 JSON，优先展示 message（中文就不会是 \uXXXX 了）
+          try {
+            const j = JSON.parse(txt);
+            const msg = j.message || j.stderrText || JSON.stringify(j);
+            showStatus(`生成失败：${msg}`, 'danger');
+          } catch {
+            showStatus(`生成失败：${txt || resp.status}`, 'danger');
+          }
+          return;
+        }
+        const data = await resp.json().catch(()=>({}));
+        showStatus(`生成成功：${data.savedAs || '已保存'}`, 'success');
+      } catch (err) {
+        showStatus(err.message || '生成失败。', 'danger');
+      }
+    });
+
+    // ---- 首次载入 ----
+    (function init(){
+      ensureState();
+      renderDomainCards();
+      initNodePositions();
+      draw();
+      renderMatrix();
+    })();
+  </script>
+  <script src="/bootstrap.bundle.min.js"></script>
+  <script>
+    // 启用所有 BS5 tooltip
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+      new bootstrap.Tooltip(el);
+    });
+  </script>
+</body>
+</html>

@@ -97,7 +97,18 @@ class CodeDto : public oatpp::DTO {
     DTO_INIT(CodeDto, DTO)
 
     DTO_FIELD(String, name);
+    DTO_FIELD(String,filename);
     DTO_FIELD(String, code);
+};
+
+class StrategyDto: public oatpp::DTO{
+    DTO_INIT(StrategyDto,DTO)
+
+    DTO_FIELD(Int32,id);
+    DTO_FIELD(String,name);
+    DTO_FIELD(String,filePath);
+    DTO_FIELD(String,soPath);
+    DTO_FIELD(String,code);
 };
 
 class SimMetricDto: public oatpp::DTO{
@@ -126,6 +137,58 @@ class SimMetricDto: public oatpp::DTO{
         transferRate=that.transferRate;
         inProgressDemandCount=that.inProgressDemandCount;
     }
+};
+
+class SubdomainConfigDto : public oatpp::DTO {
+    DTO_INIT(SubdomainConfigDto, DTO)
+
+    DTO_FIELD(UInt32, subdomainId);
+    DTO_FIELD(UInt32, nodeCount);
+    DTO_FIELD(UInt32, linkCount);
+    DTO_FIELD(UInt32,gwCount);
+    DTO_FIELD(UInt32,crossDomainLinkCount);
+    // TODO: add routing selections once per-subdomain strategies are supported.
+};
+
+class TopologyConfigDto : public oatpp::DTO {
+    DTO_INIT(TopologyConfigDto, DTO)
+
+    DTO_FIELD(UInt32, subdomainCount);
+    DTO_FIELD(List<Object<SubdomainConfigDto>>, subdomains);
+};
+
+
+//生成的拓扑
+class DomainSpecDto : public oatpp::DTO {
+  DTO_INIT(DomainSpecDto, DTO)
+  DTO_FIELD(Int32, nodes);
+  DTO_FIELD(Int32, edges);
+};
+
+class TopologyGenerateRequestDto : public oatpp::DTO {
+  DTO_INIT(TopologyGenerateRequestDto, DTO)
+
+  DTO_FIELD(String, filename);                       // 生成的拓扑文件名（例如 network_A.csv）
+  DTO_FIELD(List<Object<DomainSpecDto>>, domains);   // 每个域的 {nodes, edges}
+  DTO_FIELD(List<List<Int32>>, inter_edges);         // D×D 矩阵，i↔j 跨域边数（对称）
+
+  // 可选参数（与前端一一对应）
+  DTO_FIELD(Int32, seed)               = 42;
+  DTO_FIELD(Int32, num_pairs)          = 0;
+  DTO_FIELD(Float32, intra_pair_ratio) = 0.8f;
+  DTO_FIELD(Int32, max_pair_hops)      = 8;
+  DTO_FIELD(Int32, plot_limit)         = 1000;
+  DTO_FIELD(String, out_dir)           = String("data");
+};
+
+class TopologyGenerateResponseDto : public oatpp::DTO {
+  DTO_INIT(TopologyGenerateResponseDto, DTO)
+  DTO_FIELD(Boolean, ok);
+  DTO_FIELD(Int32, exitCode);
+  DTO_FIELD(String, savedAs);  // 例如 data/network.csv
+  DTO_FIELD(String, stdoutText);
+  DTO_FIELD(String, stderrText);
+  DTO_FIELD(String, message);  // 错误说明（如果有）
 };
 
 #include OATPP_CODEGEN_END(DTO)

@@ -34,6 +34,11 @@ public:
     int clear();
     int getAllSims(vector<SimStatusDto>& res);
 
+    int createUserRouteStrategy(std::string name,std::string soPath,std::string filePath);
+    int getAllRouteStrategyInfo(oatpp::Object<ListDto<oatpp::Object<StrategyDto>>> res);
+    int getStrategyInfoById(int id,oatpp::Object<StrategyDto>& res);
+    int deleteUserStrategyById(int id);
+    std::string getSoPathById(int id);
     //set Running to end when first init
     int setSimRunningStatusToEnd();
     

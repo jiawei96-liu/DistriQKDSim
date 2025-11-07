@@ -96,6 +96,7 @@ void QKDSim::loadCSV(const std::string& fileName, Kind kind) {
         }
     } else if (kind == Demand) {
         demand.clear();  // 清空旧的需求数据
+        std::getline(file, line); // 跳过表头
         while (std::getline(file, line)) {  // 逐行读取文件内容
             // std::cout << "Reading line: " << line << std::endl;
 

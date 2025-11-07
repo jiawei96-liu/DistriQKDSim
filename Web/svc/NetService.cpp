@@ -12,7 +12,8 @@ std::unique_ptr<NetService> NetService::instance = nullptr;
 std::once_flag NetService::initFlag;
 
 int getIndex(int routeAlg,int scheduleAlg){
-    return routeAlg*3+scheduleAlg;
+    // return routeAlg*3+scheduleAlg;
+    return 0;
 }
 
 oatpp::Object<ListDto<oatpp::Object<DemandDto>>> NetService::getAllDemands(){
@@ -157,8 +158,9 @@ bool NetService::selectDemands(std::string fileName){
 
 bool NetService::selectLinks(std::string fileName){
     for(auto sim:sims){
-        sim->loadCSV("../data/networks/"+fileName,Network);
-        sim->readCSV(Network);
+        // sim->loadCSV("../data/networks/"+fileName,Network);
+        sim->net->LoadNetworkFullCSV("../data/networks/"+fileName);
+        // sim->readCSV(Network);
     }
     
     OATPP_LOGD("select","read csv end");
@@ -346,6 +348,40 @@ void NetService::next10Step(){
     }
 }
 
+int NetService::startMultiDomain(int crossRouteAlg,int scheduleAlg,vector<int> domainRouteAlg,bool _begin){
+    auto &network=*networks[getIndex(crossRouteAlg,scheduleAlg)];
+    for(int subDomainId=0;subDomainId<domainRouteAlg.size();subDomainId++){
+        setDomainStrategy(crossRouteAlg,scheduleAlg,subDomainId,domainRouteAlg[subDomainId]);
+    }
+    if(scheduleAlg==0){
+        network.setMinimumRemainingTimeFirst();
+    }else if (scheduleAlg==1){
+        network.setAverageKeyScheduling();
+    }else if(scheduleAlg==2){
+        network.setCustomSched();
+    }
+    else{
+        return false;
+    }
+    network.InitRelayPathByMultiThread();
+    network.InitLinkDemand();
+    int success=simDao.createSim(network.simID,groupId,"sim-"+to_string(network.simID),to_string(crossRouteAlg),to_string(scheduleAlg));
+    if (success!=1)
+    {
+        cout<<"Failed to create sim in db"<<endl;
+        return false;
+    }
+    
+    
+
+    std::thread backgroundThread(&CNetwork::RunInBackGround, &network);
+    backgroundThread.detach();
+    if(_begin){
+        begin(true,crossRouteAlg,scheduleAlg);
+    }
+    return network.simID;
+}
+
 int NetService::start(int routeAlg,int scheduleAlg,bool _begin){
 
     auto &network=*networks[getIndex(routeAlg,scheduleAlg)];
@@ -372,7 +408,7 @@ int NetService::start(int routeAlg,int scheduleAlg,bool _begin){
         return false;
     }
     // network.InitRelayPath(std::thread::hardware_concurrency());
-    network.InitRelayPath();
+    network.InitRelayPathByMultiThread((size_t)4);
     network.InitLinkDemand();
     int success=simDao.createSim(network.simID,groupId,"sim-"+to_string(network.simID),to_string(routeAlg),to_string(scheduleAlg));
     if (success!=1)
@@ -512,4 +548,135 @@ void NetService::Clear(){
 
 int NetService::deleteSimById(int simId){
     simDao.deleteSimulations(simId);
+}
+
+oatpp::Object<TopologyConfigDto> NetService::getCurrentTopoConfig(){
+    auto &network=*networks[0];
+    std::vector<DomainInfo>& domain_info=network.m_vDomainInfo;
+
+    auto topoDto = TopologyConfigDto::createShared();
+    topoDto->subdomainCount = (v_uint32)domain_info.size();
+
+    // 创建 subdomain 列表
+    auto subdomainList = oatpp::List<oatpp::Object<SubdomainConfigDto>>::createShared();
+
+    // 遍历每个域，填充 SubdomainConfigDto
+    for (std::size_t i = 0; i < domain_info.size(); ++i) {
+        const DomainInfo& dom = domain_info[i];
+
+        auto sdDto = SubdomainConfigDto::createShared();
+        sdDto->subdomainId          = (v_uint32)i;
+        sdDto->nodeCount            = (v_uint32)dom.nodeNum;
+        sdDto->linkCount            = (v_uint32)dom.edgeNum;
+        sdDto->gwCount=(v_uint32)dom.gateWayNum;
+        sdDto->crossDomainLinkCount = (v_uint32)dom.crossDomainEdgeNum;
+        // 目前我们没有在DTO里放gatewayNum，如果以后需要可以扩DTO
+
+        subdomainList->push_back(sdDto);
+    }
+
+    topoDto->subdomains = subdomainList;
+
+    return topoDto;
+}
+
+// 设置某个子域的策略类型（仅设置配置，延迟生效）
+bool NetService::setDomainStrategy(int crossRoute,int scheduleAlg,int subdomainId,int domainRoute){
+    auto &network=*networks[getIndex(crossRoute,scheduleAlg)];
+    auto mgr = network.GetMultiDomainRouteMgr();
+    if(!mgr){
+        std::cerr<<"setDomainStrategy: multiDomainRouteMgr not initialized"<<std::endl;
+        return false;
+    }
+    mgr->SetDomainStrategy(subdomainId, (route::RouteStrategyType)domainRoute);
+    
+    std::string soPath="";
+    if(domainRoute>=100){
+        //User Route
+        //get soPath from db
+        soPath=simDao.getSoPathById(domainRoute);
+    }
+
+    mgr->ApplyDomainStrategyNow(subdomainId,soPath);
+    return true;
+}
+
+// 立即应用某子域策略（强制重建对象）
+bool NetService::applyDomainStrategyNow(int crossRoute,int scheduleAlg,int subdomainId){
+    auto &network=*networks[getIndex(crossRoute,scheduleAlg)];
+    auto mgr = network.GetMultiDomainRouteMgr();
+    if(!mgr){
+        std::cerr<<"applyDomainStrategyNow: multiDomainRouteMgr not initialized"<<std::endl;
+        return false;
+    }
+    mgr->ApplyDomainStrategyNow(subdomainId);
+    return true;
+}
+
+// 删除某子域策略
+bool NetService::removeDomainStrategy(int crossRoute,int scheduleAlg,int subdomainId){
+    auto &network=*networks[getIndex(crossRoute,scheduleAlg)];
+    auto mgr = network.GetMultiDomainRouteMgr();
+    if(!mgr){
+        std::cerr<<"removeDomainStrategy: multiDomainRouteMgr not initialized"<<std::endl;
+        return false;
+    }
+    mgr->RemoveDomainStrategy(subdomainId);
+    return true;
+}
+
+// 单次路由查询：返回以逗号分隔的 nodeId 列表，或空字符串表示失败
+oatpp::String NetService::routeQuery(int routeAlg,int scheduleAlg,int src,int dst){
+    auto &network=*networks[getIndex(routeAlg,scheduleAlg)];
+    std::list<NODEID> nodeList;
+    std::list<LINKID> linkList;
+    bool ok=false;
+    auto mgr = network.GetMultiDomainRouteMgr();
+    if(mgr){
+        ok = mgr->Route(src,dst,nodeList,linkList);
+    }
+    if(!ok && network.GetRouteStrategy()){
+        ok = network.GetRouteStrategy()->Route(src,dst,nodeList,linkList);
+    }
+    if(!ok) return oatpp::String("");
+    // build csv of node ids
+    std::string out;
+    for(auto id: nodeList){
+        if(!out.empty()) out += ",";
+        out += std::to_string(id);
+    }
+    return oatpp::String(out.c_str());
+}
+
+oatpp::Object<ListDto<oatpp::Object<StrategyDto>>> NetService::getAllUserRouteStrategy(){
+    auto res=ListDto<oatpp::Object<StrategyDto>>::createShared();
+    int success= simDao.getAllRouteStrategyInfo(res);
+    if(success==1){
+        return res;
+    }else {
+        return res;
+    }
+}
+
+oatpp::Object<StrategyDto> NetService::getUserRouteStrategyByID(int id,bool getCode){
+    auto res=StrategyDto::createShared();
+    int success=simDao.getStrategyInfoById(id,res);
+    if(success==1){
+        if(getCode){
+            std::string filePath=res->filePath;
+            res->code=oatpp::String::loadFromFile(filePath.c_str());
+        }
+        return res;
+    }else{
+        return nullptr;
+    }
+}
+
+int NetService::deleteRouteStrategyByID(int id){
+    int success=simDao.deleteUserStrategyById(id);
+    return success;
+}
+
+int NetService::createRouteStrategy(std::string name,std::string soPath,std::string filePath){
+    return simDao.createUserRouteStrategy(name,soPath,filePath);
 }

@@ -30,5 +30,6 @@ oatpp::String formatText(const char* text, ...);
 v_int64 getMillisTickCount();
 std::string getCurrentTimeString();
 std::string execWithOutput(const std::string& cmd);
+std::string percentDecode(const oatpp::String& s);
 
 #endif /* Utils_hpp */

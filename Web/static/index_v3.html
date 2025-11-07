@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>网络拓扑与需求管理</title>
+    <link href="/bootstrap.min.css" rel="stylesheet">
+    <script src="/axios.min.js"></script>
+    <style>
+        .container {
+            width: 100%;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .result {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            height: 500px;
+            overflow: hidden;
+            position: relative;
+        }
+        .result-content {
+            overflow-y: scroll;
+            flex-grow: 1;
+            padding-right: 10px;
+        }
+        .card-body {
+            padding: 20px;
+        }
+        .modal-content {
+            padding: 20px;
+        }
+        .modal-body {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        table thead {
+            position: sticky;
+            top: 0;
+            background-color: #f8f9fa;
+            z-index: 2;
+            box-shadow: 0 2px 2px -2px rgba(0,0,0,0.2);
+        }
+        table td {
+            background-color: #fff;
+        }
+        /* 小卡片标题 */
+        .subdomain-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+        .domain-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            grid-gap: 12px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <nav class="navbar navbar-expand-lg navbar-light bg-light mb-3">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">网络拓扑与需求管理</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                    aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" id="inputInfoLink">输入信息</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/topology-config.html">网络拓扑配置</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/sim.html" id="simulationResultLink">仿真结果</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/routeCode.html" id="relayPathLink">路由策略</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/schedCode.html" id="relayPathLink">调度策略</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/history.html" id="relayPathLink">历史仿真</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 首页操作按钮 -->
+    <div class="card mb-3">
+        <div class="card-body d-flex justify-content-between align-items-center flex-wrap">
+            <div class="d-flex align-items-center flex-wrap">
+                <h5 class="card-title mb-0 me-2">首页操作</h5>
+                <button id="simStart" class="btn btn-primary ms-0 me-2">启动</button>
+                <button id="simReset" class="btn btn-primary me-2">重置</button>
+                <button id="simAllStart" class="btn btn-primary">一键启动</button>
+            </div>
+            <!-- 右侧按钮 -->
+            <div class="d-flex ms-auto flex-wrap mt-3 mt-lg-0">
+                <button id="selectLinkBtn" class="btn btn-warning me-2" data-bs-toggle="modal" data-bs-target="#selectLinkModal">选择拓扑文件</button>
+                <button id="selectDemandBtn" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#selectDemandModal">选择需求文件</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 路由 / 调度 选择区 -->
+    <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-3">
+
+        <!-- (1) 域间路由算法选择（原“路由算法选择”区域改名&改内容） -->
+        <div class="card flex-grow-1">
+            <div class="card-body">
+                <h6 class="mb-3">域间路由算法选择</h6>
+                <div class="d-flex justify-content-between w-100 flex-wrap">
+                    <!-- OSPF -->
+                    <!-- <div class="form-check form-check-inline w-50">
+                        <input class="form-check-input" type="radio" name="interDomainRoutingAlgorithm"
+                               id="interRouteOSPF" value="OSPF" checked>
+                        <label class="form-check-label" for="interRouteOSPF">OSPF</label>
+                    </div> -->
+
+                    <!-- BGP -->
+                    <div class="form-check form-check-inline w-50">
+                        <input class="form-check-input" type="radio" name="interDomainRoutingAlgorithm"
+                               id="interRouteBGP" value="3" checked>
+                        <label class="form-check-label" for="interRouteBGP">BGP</label>
+                    </div>
+
+                    <!-- 自定义 -->
+                    <div class="form-check form-check-inline w-50">
+                        <input class="form-check-input" type="radio" name="interDomainRoutingAlgorithm"
+                               id="interRouteCustom" value="4">
+                        <label class="form-check-label" for="interRouteCustom">自定义</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- (2) 调度算法选择：保持全局不变 -->
+        <div class="card flex-grow-1">
+            <div class="card-body">
+                <h6 class="mb-3">调度算法选择</h6>
+                <div class="d-flex justify-content-between w-100 flex-wrap">
+                    <!-- 最小任务剩余时间 -->
+                    <div class="form-check form-check-inline w-50">
+                        <input class="form-check-input" type="radio" name="schedulingAlgorithm"
+                               id="minRemainingTime" value="0" checked>
+                        <label class="form-check-label" for="minRemainingTime">最小任务剩余时间</label>
+                    </div>
+
+                    <!-- 平均密钥 -->
+                    <div class="form-check form-check-inline w-50">
+                        <input class="form-check-input" type="radio" name="schedulingAlgorithm"
+                               id="avgKeyRate" value="1">
+                        <label class="form-check-label" for="avgKeyRate">平均密钥</label>
+                    </div>
+
+                    <!-- 自定义调度 -->
+                    <div class="form-check form-check-inline w-50">
+                        <input class="form-check-input" type="radio" name="schedulingAlgorithm"
+                               id="customSched" value="2">
+                        <label class="form-check-label" for="customSched">自定义调度</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- (3) 这里是“每个域的域内路由策略”容器：动态插入 -->
+    <div class="card mb-3">
+        <div class="card-body">
+            <h6 class="mb-3">域内路由策略配置</h6>
+            <div id="perDomainRoutingContainer" class="domain-grid">
+                <!-- 动态生成的每个子域卡片会插入到这里 -->
+                <!-- 例如
+                <div class="border rounded p-3">
+                    <div class="subdomain-title mb-2">子域 #0</div>
+                    <div class="text-muted small mb-2">
+                        节点数: 1200 / 域内链路: 5000 / 跨域链路: 35
+                    </div>
+                    <div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio"
+                                name="routingDomain0" id="d0_shortest" value="0" checked>
+                            <label class="form-check-label" for="d0_shortest">最短路径优先</label>
+                        </div>
+                        ...
+                    </div>
+                </div>
+                -->
+            </div>
+        </div>
+    </div>
+
+
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <div>
+            <button id="getLinksBtn" class="btn btn-primary me-2">获取拓扑信息</button>
+            <button id="getDemandsBtn" class="btn btn-primary">获取需求信息</button>
+        </div>
+    </div>
+
+    <!-- 显示操作结果 -->
+    <div id="result" class="result">
+        <div id="result-header"></div>
+        <div id="result-content" class="result-content"></div>
+
+        <div id="pagination-controls" class="d-flex justify-content-center mt-3">
+            <button id="firstPage" class="btn btn-secondary me-2">首页</button>
+            <div id="pageNumbers" class="d-flex"></div>
+            <button id="lastPage" class="btn btn-secondary ms-2">尾页</button>
+        </div>
+    </div>
+
+</div> <!-- /container -->
+
+<!-- 选择拓扑文件模态框 -->
+<div class="modal fade" id="selectLinkModal" tabindex="-1" aria-labelledby="selectLinkModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="selectLinkModalLabel">选择拓扑文件</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="linkFilesList">
+                <!-- 文件列表将动态加载 -->
+            </div>
+            <div class="modal-footer">
+                <input type="file" id="uploadLinkFile" class="form-control" />
+                <button id="uploadLinkFileBtn" class="btn btn-success">上传拓扑文件</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 选择需求文件模态框 -->
+<div class="modal fade" id="selectDemandModal" tabindex="-1" aria-labelledby="selectDemandModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="selectDemandModalLabel">选择需求文件</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="demandFilesList">
+                <!-- 文件列表将动态加载 -->
+            </div>
+            <div class="modal-footer">
+                <input type="file" id="uploadDemandFile" class="form-control" />
+                <button id="uploadDemandFileBtn" class="btn btn-success">上传需求文件</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const apiBaseUrl = "/api/v1";
+    // 新增：前端与 C++ 枚举完全对齐
+    // typedef enum {
+    //   RouteType_Bfs,                 // 0
+    //   RouteType_KeyRateShortestPath, // 1
+    //   RouteType_Ospf,                // 2
+    //   RouteType_Bgp,                 // 3
+    //   RouteType_Custom,              // 4
+    //   RouteType_demo,                // 5
+    //   RouteType_MultiDomain,         // 6
+    //   RouteType_Unknown              // 7
+    // } RouteStrategyType;
+    const ROUTE_ENUM = {
+        Bfs: 0,
+        KeyRateShortestPath: 1,
+        Ospf: 2,
+        Bgp: 3,
+        Custom: 4,
+        demo: 5,
+        MultiDomain: 6,
+        Unknown: 7,
+    };
+    const limit = 1000; // 每页 1000 条数据
+    let currentPage = 1;
+    let totalPages = 1; // 总页数
+    let currentDatasType = "links";
+
+    // ====== 新增：缓存拓扑的域信息，用于渲染 per-domain 卡片 ======
+    let currentTopologyConfig = null;
+
+    // 获取拓扑信息
+    document.getElementById('getLinksBtn').addEventListener('click', async () => {
+        currentDatasType = "links";
+        currentPage = 1;
+        fetchData();
+    });
+
+    // 获取需求信息
+    document.getElementById('getDemandsBtn').addEventListener('click', async () => {
+        currentDatasType = "demands";
+        currentPage = 1;
+        fetchData();
+    });
+
+    async function fetchData() {
+        try {
+            const offset = (currentPage - 1) * limit;
+            const response = await fetch(`${apiBaseUrl}/` + currentDatasType + `?offset=${offset}&limit=${limit}`);
+            const data = await response.json();
+            totalPages = Math.ceil(data.count / limit);
+            if (currentDatasType === "links") {
+                displayLinks(data.items);
+            } else if (currentDatasType === "demands") {
+                displayDemands(data.items);
+            }
+            updatePagination();
+        } catch (error) {
+            console.error("获取信息失败:", error);
+        }
+    }
+
+    document.getElementById('firstPage').addEventListener('click', () => {
+        if (currentPage !== 1) {
+            currentPage = 1;
+            fetchData();
+        }
+    });
+    document.getElementById('lastPage').addEventListener('click', () => {
+        if (currentPage !== totalPages) {
+            currentPage = totalPages;
+            fetchData();
+        }
+    });
+
+    //一键启动
+    document.getElementById('simAllStart').addEventListener('click', async function() {
+        // 域间路由算法
+        let interRoutingAlgorithmParam = document.querySelector('input[name="interDomainRoutingAlgorithm"]:checked').value;
+        // 调度算法
+        let schedulingAlgorithm = document.querySelector('input[name="schedulingAlgorithm"]:checked').value;
+
+        const url = `${apiBaseUrl}/sim/allStart?interRoutingAlgorithm=${interRoutingAlgorithmParam}&schedulingAlgorithm=${schedulingAlgorithm}`;
+
+        try {
+            const response = await fetch(url, { method: 'POST' });
+            if (response.status === 200) {
+                alert('启动成功');
+            } else {
+                alert('启动失败');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('请求失败');
+        }
+    });
+
+    //单个启动
+    document.getElementById('simStart').addEventListener('click', async function() {
+        const sched = parseInt(document.querySelector('input[name="schedulingAlgorithm"]:checked').value, 10);
+        const routingCfg = collectRoutingConfig();
+
+        const url = `${apiBaseUrl}/sim/oneStart`;
+        const payload = {
+            interRoutingStrategy: routingCfg.interRoutingStrategy,
+            intraDomainStrategies: routingCfg.intraDomainStrategies,
+            schedulingAlgorithm: sched
+        };
+
+        try {
+            const response = await fetch(url, {
+            method: 'POST',
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+            });
+            alert(response.status === 200 ? '启动成功' : '启动失败');
+        } catch (err) {
+            console.error('Error:', err);
+            alert('请求失败');
+        }
+    });
+    //重置
+    document.getElementById('simReset').addEventListener('click', async function() {
+        const url = `${apiBaseUrl}/sim/reset`;
+        try {
+            const response = await fetch(url, { method: 'POST' });
+            if (response.status === 200) {
+                alert('重置成功');
+                document.getElementById('result-content').innerHTML = "";
+            } else {
+                alert('重置失败');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('请求失败');
+        }
+    });
+
+    // 显示拓扑信息表格
+    function displayLinks(data) {
+        const headerDiv = document.getElementById('result-header');
+        const contentDiv = document.getElementById('result-content');
+        let header = '<h3>拓扑信息</h3>';
+        let table = `<table class="table table-bordered">
+                         <thead>
+                             <tr>
+                                 <th>Link ID</th>
+                                 <th>Source ID</th>
+                                 <th>Sink ID</th>
+                                 <th>QKD Rate</th>
+                                 <th>Delay</th>
+                                 <th>Bandwidth</th>
+                                 <th>Fault Time</th>
+                                 <th>Weight</th>
+                             </tr>
+                         </thead>
+                         <tbody>`;
+        data.forEach(link => {
+            table += `
+                <tr>
+                    <td>${link.linkId}</td>
+                    <td>${link.sourceId}</td>
+                    <td>${link.sinkId}</td>
+                    <td>${link.qkdRate}</td>
+                    <td>${link.delay}</td>
+                    <td>${link.bandwidth}</td>
+                    <td>${link.faultTime}</td>
+                    <td>${link.weight}</td>
+                </tr>`;
+        });
+        table += `</tbody></table>`;
+        headerDiv.innerHTML = header;
+        contentDiv.innerHTML = table;
+    }
+
+    // 显示需求信息表格
+    function displayDemands(data) {
+        const headerDiv = document.getElementById('result-header');
+        const contentDiv = document.getElementById('result-content');
+        let header = '<h3>需求信息</h3>';
+        let table = `<table class="table table-bordered">
+                         <thead>
+                             <tr>
+                                 <th>Demand ID</th>
+                                 <th>Source ID</th>
+                                 <th>Sink ID</th>
+                                 <th>Arrive Time</th>
+                                 <th>Complete Time</th>
+                                 <th>Demand Volume</th>
+                                 <th>Remaining Volume</th>
+                                 <th>Delivered Volume</th>
+                                 <th>All Delivered</th>
+                                 <th>Route Failed</th>
+                             </tr>
+                         </thead>
+                         <tbody>`;
+        data.forEach(demand => {
+            table += `
+                <tr>
+                    <td>${demand.demandId}</td>
+                    <td>${demand.sourceId}</td>
+                    <td>${demand.sinkId}</td>
+                    <td>${demand.arriveTime}</td>
+                    <td>${demand.completeTime}</td>
+                    <td>${demand.demandVolume}</td>
+                    <td>${demand.remainingVolume}</td>
+                    <td>${demand.deliveredVolume}</td>
+                    <td>${demand.allDelivered}</td>
+                    <td>${demand.routeFailed}</td>
+                </tr>`;
+        });
+        table += `</tbody></table>`;
+        headerDiv.innerHTML = header;
+        contentDiv.innerHTML = table;
+    }
+
+    function updatePagination() {
+        const pageNumbersDiv = document.getElementById('pageNumbers');
+        pageNumbersDiv.innerHTML = "";
+
+        const maxPagesToShow = 5;
+        let startPage = Math.max(1, currentPage - 2);
+        let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+
+        if (endPage - startPage < maxPagesToShow - 1) {
+            startPage = Math.max(1, endPage - maxPagesToShow + 1);
+        }
+
+        for (let i = startPage; i <= endPage; i++) {
+            const pageBtn = document.createElement('button');
+            pageBtn.className = `btn ${i === currentPage ? 'btn-primary' : 'btn-light'} mx-1`;
+            pageBtn.innerText = i;
+            pageBtn.addEventListener('click', () => {
+                if (currentPage !== i) {
+                    currentPage = i;
+                    fetchData();
+                }
+            });
+            pageNumbersDiv.appendChild(pageBtn);
+        }
+    }
+
+    // ====== 选择拓扑文件相关 ======
+
+    async function loadLinkFiles() {
+        const response = await fetch(`${apiBaseUrl}/file/links`);
+        const data = await response.json();
+        let html = '<ul class="list-group">';
+        data.items.forEach(file => {
+            html += `
+                <li class="list-group-item d-flex justify-content-between">
+                    ${file}
+                    <button class="btn btn-sm btn-primary" onclick="selectLinkFile('${file}')">选择</button>
+                </li>`;
+        });
+        html += '</ul>';
+        document.getElementById('linkFilesList').innerHTML = html;
+    }
+
+    async function loadDemandFiles() {
+        const response = await fetch(`${apiBaseUrl}/file/demands`);
+        const data = await response.json();
+        let html = '<ul class="list-group">';
+        data.items.forEach(file => {
+            html += `
+                <li class="list-group-item d-flex justify-content-between">
+                    ${file}
+                    <button class="btn btn-sm btn-primary" onclick="selectDemandFile('${file}')">选择</button>
+                </li>`;
+        });
+        html += '</ul>';
+        document.getElementById('demandFilesList').innerHTML = html;
+    }
+
+    // 选择拓扑文件：这里我们在选完后也去获取 topo config，刷新域内路由策略UI
+    async function selectLinkFile(fileName) {
+        await fetch(`${apiBaseUrl}/select/link/${fileName}`, { method: 'POST' });
+        alert(`已选择拓扑文件: ${fileName}`);
+        loadLinkFiles();
+        currentDatasType = "links";
+        currentPage = 1;
+        fetchData();
+
+        // 新增：刷新域内路由策略区
+        await refreshTopologyConfigAndRenderDomains();
+    }
+
+    // 选择需求文件
+    async function selectDemandFile(fileName) {
+        await fetch(`${apiBaseUrl}/select/demand/${fileName}`, { method: 'POST' });
+        alert(`已选择需求文件: ${fileName}`);
+        loadDemandFiles();
+        currentDatasType = "demands";
+        currentPage = 1;
+        fetchData();
+    }
+
+    // 上传拓扑文件
+    document.getElementById('uploadLinkFileBtn').addEventListener('click', async () => {
+        const file = document.getElementById('uploadLinkFile').files[0];
+        const formData = new FormData();
+        formData.append("file", file);
+
+        await fetch(`${apiBaseUrl}/file/links/upload`, {
+            method: 'POST',
+            body: formData
+        });
+        alert('上传拓扑文件成功');
+        loadLinkFiles();
+    });
+
+    // 上传需求文件
+    document.getElementById('uploadDemandFileBtn').addEventListener('click', async () => {
+        const file = document.getElementById('uploadDemandFile').files[0];
+        const formData = new FormData();
+        formData.append("file", file);
+
+        await fetch(`${apiBaseUrl}/file/demands/upload`, {
+            method: 'POST',
+            body: formData
+        });
+        alert('上传需求文件成功');
+        loadDemandFiles();
+    });
+
+    document.getElementById('selectLinkBtn').addEventListener('click', loadLinkFiles);
+    document.getElementById('selectDemandBtn').addEventListener('click', loadDemandFiles);
+
+    // ====== 新增：拉取拓扑配置并渲染 per-domain 卡片 ======
+    async function refreshTopologyConfigAndRenderDomains() {
+        try {
+            const resp = await fetch(`${apiBaseUrl}/topology/config`);
+            currentTopologyConfig = await resp.json();
+            renderPerDomainRoutingCards(currentTopologyConfig);
+        } catch (e) {
+            console.error("获取拓扑配置失败:", e);
+            // 清空区域以免旧数据误导
+            renderPerDomainRoutingCards(null);
+        }
+    }
+
+    function collectRoutingConfig() {
+        // 域间：整数
+        // const inter = parseInt(document.getElementById('interDomainRouteSelect').value, 10);
+        const inter = parseInt(document.querySelector('input[name="interDomainRoutingAlgorithm"]:checked').value, 10);
+
+        // 各域域内：整数数组
+        const intra = [];
+        if (currentTopologyConfig && currentTopologyConfig.subdomains) {
+            currentTopologyConfig.subdomains.forEach(sd => {
+            const domId = sd.subdomainId;
+            const sel = document.getElementById(`routingDomain${domId}_select`);
+            if (sel) {
+                intra.push({
+                subdomainId: domId,
+                strategy: parseInt(sel.value, 10),
+                });
+            }
+            });
+        }
+        return { interRoutingStrategy: inter, intraDomainStrategies: intra };
+    }
+
+    // 以 currentTopologyConfig 渲染 #perDomainRoutingContainer
+    function renderPerDomainRoutingCards(topoCfg) {
+        const container = document.getElementById('perDomainRoutingContainer');
+        container.innerHTML = "";
+
+        if (!topoCfg || !topoCfg.subdomains || topoCfg.subdomains.length === 0) {
+            container.innerHTML = `
+                <div class="text-muted small">
+                    当前未加载拓扑或拓扑中没有子域。
+                </div>`;
+            return;
+        }
+
+        topoCfg.subdomains.forEach(sd => {
+            const domId = sd.subdomainId;
+            const nodeCount = sd.nodeCount;
+            const linkCount = sd.linkCount;
+            const crossDomainLinkCount = sd.crossDomainLinkCount;
+
+            // 原来的 groupName 仍然保留，用于区分每个域的策略
+            const groupName = `routingDomain${domId}`;
+
+            const cardHtml = `
+                <div class="border rounded p-3 bg-white">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <div class="subdomain-title">子域 #${domId}</div>
+                            <div class="text-muted small">
+                                节点数: ${nodeCount} /
+                                域内链路: ${linkCount} /
+                                跨域链路: ${crossDomainLinkCount}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="small fw-semibold mb-1">域内路由策略</div>
+                    <div class="d-flex align-items-center">
+                        <select class="form-select form-select-sm w-auto"
+                                id="${groupName}_select"
+                                name="${groupName}">
+                            <option value="0" selected>最短路径优先</option>
+                            <option value="1">密钥速率优先</option>
+                            <option value="4">自定义路由</option>
+                        </select>
+                    </div>
+                </div>
+            `;
+
+            container.insertAdjacentHTML('beforeend', cardHtml);
+        });
+    }
+
+    // 页面初始化时尝试加载一次拓扑配置（比如服务里已有默认拓扑）
+    refreshTopologyConfigAndRenderDomains();
+</script>
+
+<script src="/bootstrap.bundle.min.js"></script>
+
+</body>
+</html>

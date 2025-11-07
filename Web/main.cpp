@@ -1,5 +1,7 @@
 #include "Web/controller/DemandController.hpp"
 #include "Web/controller/StaticController.hpp"
+#include "Web/controller/TopologyConfigController.hpp"
+#include "Web/controller/UserStrategyController.hpp"
 #include "Web/controller/LinkController.hpp"
 #include "Web/controller/SimController.hpp"
 #include "Web/AppComponent.hpp"
@@ -22,7 +24,9 @@ void runMaster() {
   router->addController(std::make_shared<DemandController>());
   router->addController(std::make_shared<LinkController>());
   router->addController(std::make_shared<SimController>());
+  router->addController(std::make_shared<TopologyConfigController>());
   router->addController(StaticController::createShared());
+  router->addController(UserStrategyController::createShared());
 
   /* Get connection handler component */
   OATPP_COMPONENT(std::shared_ptr<oatpp::network::ConnectionHandler>, connectionHandler);
@@ -53,6 +57,7 @@ void runWorker() {
   router->addController(std::make_shared<DemandController>());
   router->addController(std::make_shared<LinkController>());
   router->addController(std::make_shared<SimController>());
+  router->addController(std::make_shared<TopologyConfigController>());
 
   /* Get connection handler component */
   OATPP_COMPONENT(std::shared_ptr<oatpp::network::ConnectionHandler>, connectionHandler);

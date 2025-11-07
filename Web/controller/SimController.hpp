@@ -2,6 +2,7 @@
 #define SimController_hpp
 
 #include "Web/dto/DTOs.hpp"
+#include "Web/dto/SimDTOs.hpp"
 #include "Web/svc/NetService.hpp"
 
 
@@ -11,7 +12,7 @@
 #include "Alg/Network.h"
 
 #include "oatpp/web/protocol/http/outgoing/StreamingBody.hpp"
-
+#include "Alg/Route/RouteFactory.h"
 
 
 #include OATPP_CODEGEN_BEGIN(ApiController) //<-- Begin Codegen
@@ -23,6 +24,10 @@ class SimController : public oatpp::web::server::api::ApiController {
 private:
 
     NetService* netService=NetService::getInstance();
+    static int clampRouteType(int v) {
+        if (v < route::RouteType_Bfs || v > route::RouteType_Unknown) return route::RouteType_Unknown;
+        return v;
+    }
 public:
     /**
      * Constructor with object mapper.
@@ -62,12 +67,62 @@ public:
 
     }
 
-    ENDPOINT("POST", "/api/v1/sim/oneStart", simOneStart,QUERY(Int32, routeAlg, "routingAlgorithm"),QUERY(Int32, scheduleAlg, "schedulingAlgorithm")) {
-        //启动
-        OATPP_LOGI("Sim","Start with route alg %d, schedule alg %d",routeAlg.getValue(0),scheduleAlg.getValue(0));
+    // ENDPOINT("POST", "/api/v1/sim/oneStart", simOneStart,QUERY(Int32, routeAlg, "routingAlgorithm"),QUERY(Int32, scheduleAlg, "schedulingAlgorithm")) {
+    //     //启动
+    //     OATPP_LOGI("Sim","Start with route alg %d, schedule alg %d",routeAlg.getValue(0),scheduleAlg.getValue(0));
 
-        // bool success=netService->start(routeAlg.getValue(0),scheduleAlg.getValue(0));
-        int simID=netService->start(routeAlg.getValue(0),scheduleAlg.getValue(0),true);
+    //     // bool success=netService->start(routeAlg.getValue(0),scheduleAlg.getValue(0));
+    //     int simID=netService->start(routeAlg.getValue(0),scheduleAlg.getValue(0),true);
+    //     if(simID!=0){
+    //         return createResponse(Status::CODE_200,to_string(simID));
+    //     }else{
+    //         return createResponse(Status::CODE_400,"路由或调度策略的参数非法");
+    //     }
+
+    // }
+
+     ENDPOINT("POST", "/api/v1/sim/oneStart", simOneStart,BODY_DTO(oatpp::Object<SimStartRequestDto>, body)) {
+
+        if (!body) {
+        auto resp = SimpleRespDto::createShared();
+        resp->success = false;
+        resp->message = "Empty body";
+        return createDtoResponse(Status::CODE_400, resp);
+        }
+        // body->interRoutingStrategy.getValue()
+        // 读取并校验枚举
+        const int crossRouteAlg = clampRouteType(body->interRoutingStrategy.getValue(-1));
+        const int scheduleAlg   = body->schedulingAlgorithm.getValue(-1);
+
+        // 统计最大 subdomainId，用于构造 vector<int>（index = subdomainId）
+        int maxDomId = -1;
+        if (body->intraDomainStrategies) {
+        for (const auto& it : *body->intraDomainStrategies) {
+            if (it && it->subdomainId) {
+            maxDomId = std::max(maxDomId, it->subdomainId.getValue(0));
+            }
+        }
+        }
+        int domainNum=body->intraDomainStrategies->size();
+        vector<int> intraDomainStrategies(domainNum);
+        for(int i=0;i<domainNum;i++){
+            intraDomainStrategies[i]=body->intraDomainStrategies[i].get()->strategy;
+        }
+        int simID = 0;
+        try {
+            simID = netService->startMultiDomain(crossRouteAlg, scheduleAlg, intraDomainStrategies, true);
+        } catch (const std::exception& e) {
+            auto resp = SimpleRespDto::createShared();
+            resp->success = false;
+            resp->message = std::string("Exception: ") + e.what();
+            return createDtoResponse(Status::CODE_500, resp);
+        } catch (...) {
+            auto resp = SimpleRespDto::createShared();
+            resp->success = false;
+            resp->message = "Unknown error";
+            return createDtoResponse(Status::CODE_500, resp);
+        }
+
         if(simID!=0){
             return createResponse(Status::CODE_200,to_string(simID));
         }else{

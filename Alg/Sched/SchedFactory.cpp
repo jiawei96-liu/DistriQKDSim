@@ -1,6 +1,7 @@
 #include "SchedFactory.h"
 #include "MinStrategy.h"
 #include "AvgStrategy.h"
+#include "ReservationStrategy.h"
 #include "CustomSchedStrategy.h"
 #include "Alg/Network.h"
 #include <dlfcn.h>
@@ -61,9 +62,12 @@ std::unique_ptr<SchedStrategy> SchedFactory::CreateStrategy(SchedStrategyType ty
     }else if(type==SchedType_Avg){
         cout << "平均密钥调度算法" << endl;
         return std::make_unique<AvgStrategy>(net);
+    }else if(type==SchedType_Reserve){
+        cout << "端到端预约调度算法" << endl;
+        return std::make_unique<ReservationStrategy>(net);
     }
     else if(type==SchedType_Custom){
-        cout << "自定义路由算法" << endl;
+        cout << "自定义调度算法" << endl;
         unloadUserSchedStrategy();
         return loadUserCustomSchedStrategy(net);  //动态加载用户实现
     }

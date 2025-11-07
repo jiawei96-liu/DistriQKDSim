@@ -1,5 +1,6 @@
 # 生成库文件
 set(OATPP_INCLUDE_DIR /usr/local/include/oatpp-1.3.0/oatpp)
+set(CMAKE_CXX_FLAGS "-fPIC")
 add_library(alg STATIC
     QKDSim.cpp
     Demand.cpp
@@ -18,9 +19,11 @@ add_library(alg STATIC
     Route/KeyRateFibStrategy.cpp
     Route/OspfStrategy.cpp
     Route/BgpStrategy.cpp
+    Route/MultiDomainRouteManager.cpp
     Sched/AvgStrategy.cpp
     Sched/CustomSchedStrategy.cpp
     Sched/MinStrategy.cpp
+    Sched/ReservationStrategy.cpp
     Sched/SchedFactory.cpp
     Route/RouteFactory.cpp
     Route/KeyRateFibStrategy.cpp

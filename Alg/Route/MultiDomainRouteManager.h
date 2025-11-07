@@ -13,7 +13,7 @@ class CNetwork;
 
 namespace route {
 
-class MultiDomainRouteManager {
+class MultiDomainRouteManager{
 public:
     MultiDomainRouteManager(CNetwork* net);
     ~MultiDomainRouteManager();
@@ -34,7 +34,7 @@ public:
     // 移除某个子域的策略配置和对象
     void RemoveDomainStrategy(int subdomainId);
     // 立即应用（重建）某子域的策略对象（强制重建）
-    void ApplyDomainStrategyNow(int subdomainId);
+    void ApplyDomainStrategyNow(int subdomainId,std::string soPath="");
 
     // 主调度接口：自动分流
     bool Route(NODEID sourceId, NODEID sinkId, std::list<NODEID>& nodeList, std::list<LINKID>& linkList);

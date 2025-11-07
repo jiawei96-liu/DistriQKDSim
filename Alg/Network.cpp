@@ -9,8 +9,20 @@ void CNetwork::LoadNetworkFullCSV(const std::string& filename) {
         std::cerr << "无法打开网络文件: " << filename << std::endl;
         return;
     }
+
+    // ===== 新增: 统计每个域的信息的临时结构 =====
+    // 用 unordered_map<int, std::set<int>> 来去重
+    std::unordered_map<int, std::set<int>> domainNodes;        // 域 -> 该域包含的节点ID集合
+    std::unordered_map<int, std::set<int>> domainGateways;     // 域 -> 该域中为网关的节点ID集合
+    std::unordered_map<int, int>            domainIntraEdges;  // 域 -> 域内链路计数
+    std::unordered_map<int, int>            domainCrossEdges;  // 域 -> 跨域链路计数
+
     std::string line;
     std::getline(file, line); // 跳过表头
+    UINT totalNodeNum=0;
+    UINT totalLinkNum=0;
+    SetNodeNum(20000);
+    InitNodes(20000);
     while (std::getline(file, line)) {
         std::stringstream ss(line);
         std::string item;
@@ -19,30 +31,36 @@ void CNetwork::LoadNetworkFullCSV(const std::string& filename) {
             tokens.push_back(item);
         }
         if (tokens.size() < 13) continue;
-        LINKID linkId = std::stoi(tokens[0]);
-        NODEID src = std::stoi(tokens[1]);
-        NODEID dst = std::stoi(tokens[2]);
-        double keyRate = std::stod(tokens[3]);
-        double delay = std::stod(tokens[4]);
-        double bandwidth = std::stod(tokens[5]);
-        double weight = std::stod(tokens[6]);
-        double faultTime = std::stod(tokens[7]);
-        int is_cross = std::stoi(tokens[8]);
-        int src_subdomain = std::stoi(tokens[9]);
-        bool src_isGateway = std::stoi(tokens[10]) != 0;
-        int dst_subdomain = std::stoi(tokens[11]);
-        bool dst_isGateway = std::stoi(tokens[12]) != 0;
-        // 节点信息补全
-        if (src >= m_vAllNodes.size()) m_vAllNodes.resize(src+1);
-        if (dst >= m_vAllNodes.size()) m_vAllNodes.resize(dst+1);
+
+        LINKID linkId         = std::stoi(tokens[0]);
+        NODEID src            = std::stoi(tokens[1]);
+        NODEID dst            = std::stoi(tokens[2]);
+        double keyRate        = std::stod(tokens[3]);
+        double delay          = std::stod(tokens[4]);
+        double bandwidth      = std::stod(tokens[5]);
+        double weight         = std::stod(tokens[6]);
+        double faultTime      = std::stod(tokens[7]);
+        int    is_cross       = std::stoi(tokens[8]);   // 1=跨域链路, 0=域内链路
+        int    src_subdomain  = std::stoi(tokens[9]);   // 源节点所属域
+        bool   src_isGateway  = std::stoi(tokens[10]) != 0;
+        int    dst_subdomain  = std::stoi(tokens[11]);  // 目的节点所属域
+        bool   dst_isGateway  = std::stoi(tokens[12]) != 0;
+
+        // ========= 原有逻辑：补全节点信息 =========
+        if (src >= (int)m_vAllNodes.size()) m_vAllNodes.resize(src + 1);
+        if (dst >= (int)m_vAllNodes.size()) m_vAllNodes.resize(dst + 1);
+
         m_vAllNodes[src].SetNodeId(src);
         m_vAllNodes[src].SetSubdomainId(src_subdomain);
         m_vAllNodes[src].SetIsGateway(src_isGateway);
+
         m_vAllNodes[dst].SetNodeId(dst);
         m_vAllNodes[dst].SetSubdomainId(dst_subdomain);
         m_vAllNodes[dst].SetIsGateway(dst_isGateway);
-        // 链路信息
-        if (linkId >= m_vAllLinks.size()) m_vAllLinks.resize(linkId+1);
+
+        // ========= 原有逻辑：补全链路信息 =========
+        // if (linkId >= (int)m_vAllLinks.size()) m_vAllLinks.resize(linkId + 1);
+
         CLink link;
         link.SetLinkId(linkId);
         link.SetSourceId(src);
@@ -52,11 +70,119 @@ void CNetwork::LoadNetworkFullCSV(const std::string& filename) {
         link.SetBandwidth(bandwidth);
         link.SetWeight(weight);
         link.SetFaultTime(faultTime);
-        link.SetSubdomainId(is_cross ? -1 : src_subdomain);
-        m_vAllLinks[linkId] = link;
+        link.SetSubdomainId(is_cross ? -1 : src_subdomain); // 跨域链路用 -1
+        
+        m_vAllLinks.push_back(link);
+        m_mNodePairToLink[make_pair(src, dst)] = linkId;
+        m_mNodePairToLink[make_pair(dst, src)] = linkId;
+
+        InitKeyManagerOverLink(linkId);
+
+        m_vAllNodes[src].m_lAdjNodes.push_back(dst);
+        m_vAllNodes[dst].m_lAdjNodes.push_back(src);
+        // ========= 新增逻辑：按域统计 =========
+
+        // 记录节点属于哪个域
+        domainNodes[src_subdomain].insert(src);
+        domainNodes[dst_subdomain].insert(dst);
+
+        // 记录网关（去重）
+        if (src_isGateway) {
+            domainGateways[src_subdomain].insert(src);
+        }
+        if (dst_isGateway) {
+            domainGateways[dst_subdomain].insert(dst);
+        }
+
+        if (!is_cross) {
+            // 域内链路：只有当两端同域时才算到这个域的edgeNum
+            if (src_subdomain == dst_subdomain) {
+                domainIntraEdges[src_subdomain] += 1;
+            } else {
+                // is_cross=0 但域不同，理论上不应该发生；如果会发生你可以决定怎么处理
+                // 这里我们暂时忽略
+            }
+        } else {
+            // 跨域链路：这条边连接了至少两个域
+            // 我们可以把它计到两个端点各自的 crossDomainEdgeNum
+            domainCrossEdges[src_subdomain] += 1;
+            if (dst_subdomain != src_subdomain) {
+                domainCrossEdges[dst_subdomain] += 1;
+            }
+            // cout<<src_subdomain<<"->"<<domainCrossEdges[src_subdomain]<<endl;
+        }
     }
+
     file.close();
+
+    // ========= 新增逻辑：把统计结果写回 m_vDomainInfo =========
+    // 我们希望 m_vDomainInfo[domainId] 对应 domainId.
+    // 如果域ID不是连续的，你也可以选择用 push_back 顺序存；下面这版假设域ID是0..D-1连续，
+    // 如果不是连续的我们会自动扩到 maxId+1，并且没出现的域用0填充。
+
+    // 找到最大的域ID
+    int maxDomainId = -1;
+    for (const auto& kv : domainNodes) {
+        if (kv.first > maxDomainId) maxDomainId = kv.first;
+    }
+    for (const auto& kv : domainIntraEdges) {
+        if (kv.first > maxDomainId) maxDomainId = kv.first;
+    }
+    for (const auto& kv : domainCrossEdges) {
+        if (kv.first > maxDomainId) maxDomainId = kv.first;
+    }
+    for (const auto& kv : domainGateways) {
+        if (kv.first > maxDomainId) maxDomainId = kv.first;
+    }
+
+    m_vDomainInfo.clear();
+    m_vDomainInfo.resize(maxDomainId + 1, DomainInfo(0,0,0,0));
+
+    // SetNodeNum()
+
+    for (int dom = 0; dom <= maxDomainId; ++dom) {
+        int nodeNum            = 0;
+        int edgeNum            = 0;
+        int gatewayNum         = 0;
+        int crossDomainEdgeNum = 0;
+
+        // nodeNum
+        auto itNodes = domainNodes.find(dom);
+        if (itNodes != domainNodes.end()) {
+            nodeNum = static_cast<int>(itNodes->second.size());
+        }
+        totalNodeNum+=nodeNum;
+        // edgeNum (域内链路数)
+        auto itIntra = domainIntraEdges.find(dom);
+        if (itIntra != domainIntraEdges.end()) {
+            edgeNum = itIntra->second;
+        }
+        totalLinkNum+=edgeNum;
+
+        // gatewayNum
+        auto itGw = domainGateways.find(dom);
+        if (itGw != domainGateways.end()) {
+            gatewayNum = static_cast<int>(itGw->second.size());
+        }
+
+        // crossDomainEdgeNum
+        auto itCross = domainCrossEdges.find(dom);
+        if (itCross != domainCrossEdges.end()) {
+            crossDomainEdgeNum = itCross->second;
+        }
+        // cout<<"domain:"<<dom<<" crossEdge:"<<crossDomainEdgeNum<<endl;
+
+        m_vDomainInfo[dom] = DomainInfo(
+            nodeNum,
+            edgeNum,
+            gatewayNum,
+            crossDomainEdgeNum
+        );
+    }
+    // SetNodeNum(totalNodeNum);
+    SetLinkNum(m_vAllLinks.size());
 }
+
 #include "Network.h"
 #include "Link.h"
 #include "DistributedIDGenerator.h"
@@ -95,6 +221,16 @@ CNetwork::CNetwork(void):simDao(new SimDao())
 
     m_routeStrategy=std::move(m_routeFactory->CreateStrategy(route::RouteType_demo));   //自定义路由算法
 
+    // 初始化多域路由控制器（依赖 m_routeFactory）
+    try {
+        m_multiDomainRouteMgr = std::make_shared<route::MultiDomainRouteManager>(this);
+        // 可以在此设置默认策略（如需要）
+        m_multiDomainRouteMgr->SetDefaultStrategy(route::RouteType_Ospf);
+    } catch (...) {
+        std::cerr << "[CNetwork] Warning: failed to create MultiDomainRouteManager" << std::endl;
+        m_multiDomainRouteMgr = nullptr;
+    }
+
     // currentScheduleAlg = [this](NODEID nodeId, map<DEMANDID, VOLUME>& relayDemands) -> TIME
     // {
     //     return this->MinimumRemainingTimeFirst(nodeId, relayDemands);
@@ -121,7 +257,7 @@ void CNetwork::Clear()
     m_vAllRelayPaths.clear();
     m_mNodePairToLink.clear();
     m_mDemandArriveTime.clear();
-    simID=rand()%UINT32_MAX;
+    simID=DistributedIDGenerator::next_id();
     status="End";
     // currentRouteAlg = [this](NODEID sourceId, NODEID sinkId, list<NODEID>& nodeList, list<LINKID>& linkList) -> bool
     // {
@@ -788,8 +924,15 @@ void CNetwork::InitRelayPath(DEMANDID demandId) {
         m_vAllDemands[demandId].m_Path.Clear();
     }
 
-    // 调用路由函数，寻找从 sourceId 到 sinkId 的最短/负载均衡路径
-    if (m_routeStrategy->Route(sourceId, sinkId, nodeList, linkList)) {
+    // 调用路由函数，优先使用多域路由控制器；若不可用则回退到单一路由策略
+    bool routed = false;
+    if (m_multiDomainRouteMgr) {
+        routed = m_multiDomainRouteMgr->Route(sourceId, sinkId, nodeList, linkList);
+    }
+    if (!routed && m_routeStrategy) {
+        routed = m_routeStrategy->Route(sourceId, sinkId, nodeList, linkList);
+    }
+    if (routed) {
         if (m_dSimTime > 0) {
             // 恢复源节点上的待传输数据量，以进行重传
             VOLUME RemainingVolume = m_vAllDemands[demandId].GetDemandVolume() - m_vAllDemands[demandId].GetDeliveredVolume();
@@ -814,7 +957,7 @@ void CNetwork::InitLinkDemand()
             m_vAllLinks[linkid].m_lCarriedDemands.insert(demand.GetDemandId());
             // cout << "linkid" << linkid << endl;
             // cout << "demandid" << demand.GetDemandId() << endl;
-            cout<<"InitLinkDemand function eshtaning"<<endl;
+            // cout<<"InitLinkDemand function eshtaning"<<endl;
         }
     }
 
@@ -866,47 +1009,47 @@ void CNetwork::InitRelayPath()
 }
 
 // // 为所有需求初始化中继路径(并发)
-// void CNetwork::InitRelayPath(size_t max_threads = std::thread::hardware_concurrency()) {
-//     std::cout << "Init Relay Path" << std::endl;
-//     auto start = std::chrono::high_resolution_clock::now();
+void CNetwork::InitRelayPathByMultiThread(size_t max_threads) {
+    std::cout << "Init Relay Path" << std::endl;
+    auto start = std::chrono::high_resolution_clock::now();
 
-//     // 如果未指定最大线程数，则使用硬件支持的线程数
-//     if (max_threads == 0) {
-//         max_threads = std::thread::hardware_concurrency();
-//     }
+    // 如果未指定最大线程数，则使用硬件支持的线程数
+    if (max_threads == 0) {
+        max_threads = std::thread::hardware_concurrency();
+    }
 
-//     // 创建线程池
-//     std::vector<std::thread> threads;
-//     threads.reserve(max_threads); // 预分配线程空间
+    // 创建线程池
+    std::vector<std::thread> threads;
+    threads.reserve(max_threads); // 预分配线程空间
 
-//     // 任务分块处理
-//     size_t num_demands = m_vAllDemands.size();
-//     size_t chunk_size = (num_demands + max_threads - 1) / max_threads; // 每个线程处理的任务数
+    // 任务分块处理
+    size_t num_demands = m_vAllDemands.size();
+    size_t chunk_size = (num_demands + max_threads - 1) / max_threads; // 每个线程处理的任务数
 
-//     // 启动线程处理任务块
-//     for (size_t i = 0; i < max_threads; ++i) {
-//         size_t start_index = i * chunk_size;
-//         size_t end_index = std::min(start_index + chunk_size, num_demands);
+    // 启动线程处理任务块
+    for (size_t i = 0; i < max_threads; ++i) {
+        size_t start_index = i * chunk_size;
+        size_t end_index = std::min(start_index + chunk_size, num_demands);
 
-//         threads.emplace_back([this, start_index, end_index]() {
-//             for (size_t j = start_index; j < end_index; ++j) {
-//                 DEMANDID demandId = m_vAllDemands[j].GetDemandId();
-//                 InitRelayPath(demandId); // 每个线程处理一个任务块
+        threads.emplace_back([this, start_index, end_index]() {
+            for (size_t j = start_index; j < end_index; ++j) {
+                DEMANDID demandId = m_vAllDemands[j].GetDemandId();
+                InitRelayPath(demandId); // 每个线程处理一个任务块
 
-//                 std::this_thread::sleep_for(std::chrono::milliseconds(400));
-//             }
-//         });
-//     }
+                // std::this_thread::sleep_for(std::chrono::milliseconds(400));
+            }
+        });
+    }
 
-//     // 等待所有线程完成
-//     for (auto& thread : threads) {
-//         thread.join();
-//     }
+    // 等待所有线程完成
+    for (auto& thread : threads) {
+        thread.join();
+    }
 
-//     auto end = std::chrono::high_resolution_clock::now();
-//     std::chrono::duration<double> elapsed = end - start;
-//     std::cout << "InitRelayPath time: " << elapsed.count() << " seconds" << std::endl;
-// }
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+    std::cout << "InitRelayPath time: " << elapsed.count() << " seconds" << std::endl;
+}
 
 // 计算给定节点 nodeId 上最小剩余时间优先的需求转发时间，并记录将要转发的需求和数据量
 // 基于节点
@@ -1433,7 +1576,7 @@ TIME CNetwork::AverageKeySchedulingLinkBased(LINKID linkId, map<DEMANDID, VOLUME
 // 为指定节点 nodeId 找到需要转发的需求，并计算所需时间
 TIME CNetwork::FindDemandToRelay(NODEID nodeId, map<DEMANDID, VOLUME> &relayDemand)
 {
-    // return currentScheduleAlg(nodeId, relayDemand);
+    // default: use configured scheduling strategy
     return m_schedStrategy->Sched(nodeId,relayDemand);
 }
 
@@ -1796,10 +1939,100 @@ void CNetwork::UpdateRemainingKeys(TIME executionTime)
 // 更新所有链路上的剩余密钥数量
 void CNetwork::UpdateRemainingKeys(TIME executionTime, TIME m_dSimTime)
 {
-    for (auto linkIter = m_vAllLinks.begin(); linkIter != m_vAllLinks.end(); linkIter++)
+    for (LINKID lid = 0; lid < m_vAllLinks.size(); ++lid)
     {
-        linkIter->UpdateRemainingKeys(executionTime, m_dSimTime);
+        m_vAllLinks[lid].UpdateRemainingKeys(executionTime, m_dSimTime);
+        // after updating keys on this link, attempt to re-reserve for demands waiting on this link
+        ReattemptReservationsForLink(lid);
     }
+}
+
+// Attempt to reserve end-to-end for demands that are waiting on a specific link
+void CNetwork::ReattemptReservationsForLink(LINKID linkId)
+{
+    // copy waiting requests under lock
+    std::deque<CLink::WaitingRequest> waitingCopy;
+    {
+        std::lock_guard<std::mutex> lk(m_vAllLinks[linkId].m_mutex);
+        waitingCopy = m_vAllLinks[linkId].m_waitingQueue;
+    }
+
+    // deduplicate demands (preserve order by first appearance)
+    std::unordered_set<DEMANDID> seen;
+    for (auto &req : waitingCopy) {
+        if (seen.count(req.demandid)) continue;
+        seen.insert(req.demandid);
+        // attempt reservation for this demand starting from the origin node
+        AttemptReserveForDemandFromNode(req.demandid, req.originNode);
+    }
+}
+
+// Try to reserve keys along remaining path of a demand starting from node 'fromNode'
+bool CNetwork::AttemptReserveForDemandFromNode(DEMANDID demandid, NODEID fromNode)
+{
+    auto &demand = m_vAllDemands[demandid];
+    TIME now = m_dSimTime;
+    VOLUME required = m_vAllNodes[fromNode].m_mRelayVolume[demandid];
+    if (required == 0) return false;
+
+    // construct remaining link list
+    std::vector<LINKID> remainingLinks;
+    NODEID cur = fromNode;
+    while (cur != demand.GetSinkId()) {
+        auto &nextMap = demand.m_Path.m_mNextNode;
+        if (!nextMap.count(cur)) return false;
+        NODEID nxt = nextMap[cur];
+        auto it = m_mNodePairToLink.find(std::make_pair(cur, nxt));
+        if (it == m_mNodePairToLink.end()) return false;
+        remainingLinks.push_back(it->second);
+        cur = nxt;
+        if (remainingLinks.size() > GetLinkNum()) return false;
+    }
+
+    // attempt TryReserve on each link in ascending link id order
+    std::vector<LINKID> lockOrder = remainingLinks;
+    std::sort(lockOrder.begin(), lockOrder.end());
+    std::vector<LINKID> reservedLinks;
+    for (LINKID lid : lockOrder) {
+        CLink &lk = m_vAllLinks[lid];
+        if (lk.GetFaultTime() > 0 && lk.GetFaultTime() <= now) { // failed
+            // release partial
+            for (LINKID rl : reservedLinks) m_vAllLinks[rl].ReleaseReservation(demandid);
+            return false;
+        }
+        if (!lk.TryReserve(demandid, required, demand.GetArriveTime())) {
+            // release partial
+            for (LINKID rl : reservedLinks) m_vAllLinks[rl].ReleaseReservation(demandid);
+            return false;
+        }
+        reservedLinks.push_back(lid);
+    }
+
+    // commit on all links
+    for (LINKID lid : reservedLinks) {
+        m_vAllLinks[lid].CommitReservation(demandid);
+        m_vAllLinks[lid].wait_or_not = false;
+    }
+
+    // 预约成功：从路径上所有链路的等待队列中移除该请求，并将该需求加入准备转发集合
+    for (LINKID lid : remainingLinks) {
+        CLink &lk = m_vAllLinks[lid];
+        std::lock_guard<std::mutex> lkguard(lk.m_mutex);
+        // 移除等待队列中所有与 demandid 匹配的项
+        for (auto it = lk.m_waitingQueue.begin(); it != lk.m_waitingQueue.end();) {
+            if (it->demandid == demandid) it = lk.m_waitingQueue.erase(it);
+            else ++it;
+        }
+    }
+
+    // 标记此需求已完成端到端预约，准备在下一仿真步进行转发
+    {
+        std::lock_guard<std::mutex> nlk(mtx);
+        m_readyToRelay.insert(demandid);
+    }
+
+    // success
+    return true;
 }
 
 // 检查是否所有需求都已完成传输，如果有未完成的需求返回 false，否则返回 true
@@ -1958,7 +2191,7 @@ void CNetwork::Rerouting()
 
 void CNetwork::StoreSimRes(){
     vector<SimResultStatus> res;
-    beforeStore();
+    // beforeStore();
     for (NODEID nodeId = 0; nodeId < GetNodeNum(); nodeId++)
     {
         for (auto demandIter = m_vAllNodes[nodeId].m_mRelayVolume.begin(); demandIter != m_vAllNodes[nodeId].m_mRelayVolume.end();)

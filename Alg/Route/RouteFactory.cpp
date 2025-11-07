@@ -87,3 +87,31 @@ std::unique_ptr<RouteStrategy> RouteFactory::CreateStrategy(RouteStrategyType ty
 }
 
 
+
+std::unique_ptr<RouteStrategy> RouteFactory::CreateUserStrategy(std::string soPath) {
+    if (soPath==""){
+        cout<<"[Error]CreateUserStrategy:No soPath Found"<<endl;
+        return nullptr;
+    }
+
+    void* handler = nullptr;
+    CreateFunc creater = nullptr;
+    if (!handler) {
+        std::cout<<"dlopen "+soPath<<endl;
+        handler = dlopen(soPath.c_str(), RTLD_NOW);
+        if (!handler) {
+            std::cerr << "dlopen failed: " << dlerror() << std::endl;
+            return nullptr;
+        }
+
+        creater = (CreateFunc)dlsym(handler, "createRouteStrategy");
+        if (!creater) {
+            std::cerr << "dlsym failed: " << dlerror() << std::endl;
+            dlclose(handler);
+            handler = nullptr;
+            return nullptr;
+        }
+    }
+
+    return std::unique_ptr<CustomRouteStrategy>(creater(net));
+}

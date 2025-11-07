@@ -52,6 +52,11 @@ public:
         return createDtoResponse(Status::CODE_200, result);
     }
 
+   ENDPOINT("GET", "/api/v1/topology/config", getTopologyConfig) {
+    auto config = NetService::getInstance()->getCurrentTopoConfig();
+    return createDtoResponse(Status::CODE_200, config);
+  }
+
     ENDPOINT("GET", "/api/v1/file/links", getLinkFiles) {
         //获取../data/links/目录下所有文件的文件名并返回
         auto result=netService->getLinkFileNames();

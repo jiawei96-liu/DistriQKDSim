@@ -75,7 +75,16 @@ public:
     oatpp::Object<SimMetricDto> getSimMetric(int route,int sched,int step,int simId=0);
 
     oatpp::Object<ListDto<oatpp::Object<SimStatusDto>>> getHistorySims();
+
+    oatpp::Object<TopologyConfigDto> getCurrentTopoConfig();
     int deleteSimById(int simId);
+
+    // Multi-domain controller APIs
+    bool setDomainStrategy(int routeAlg,int scheduleAlg,int subdomainId,int strategyType);
+    bool applyDomainStrategyNow(int routeAlg,int scheduleAlg,int subdomainId);
+    bool removeDomainStrategy(int routeAlg,int scheduleAlg,int subdomainId);
+    oatpp::String routeQuery(int routeAlg,int scheduleAlg,int src,int dst);
+    int startMultiDomain(int crossRouteAlg,int scheduleAlg,vector<int> domainRouteAlg,bool _begin);
 
     void begin(bool on,int routeAlg,int scheduleAlg);
 
@@ -88,6 +97,13 @@ public:
     int start(int routeAlg,int scheduleAlg,bool _begin=false);
 
     bool allStart();
+
+
+    //Route Strategy Controller API
+    oatpp::Object<ListDto<oatpp::Object<StrategyDto>>> getAllUserRouteStrategy();
+    oatpp::Object<StrategyDto> getUserRouteStrategyByID(int id,bool getCode=true);
+    int deleteRouteStrategyByID(int id);
+    int createRouteStrategy(std::string name,std::string soPath,std::string filePath);
 };
 
 #endif

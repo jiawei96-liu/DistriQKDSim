@@ -25,7 +25,7 @@ MultiDomainRouteManager::~MultiDomainRouteManager() {
 
 // 配置某个子域的路由类型（如OSPF、BFS、KeyRate等），支持动态切换
 void MultiDomainRouteManager::SetDomainStrategy(int subdomainId, RouteStrategyType type) {
-    std::lock_guard<std::mutex> lock(mtx);
+    // std::lock_guard<std::mutex> lock(mtx);
     domainStrategyMap[subdomainId] = type;
     // 清理旧对象，延迟重建，保证切换协议时生效
     if (domainStrategyObj.count(subdomainId)) {
@@ -85,15 +85,21 @@ void MultiDomainRouteManager::RemoveDomainStrategy(int subdomainId) {
     std::cerr << "[MultiDomainRouteManager] Removed strategy for domain " << subdomainId << std::endl;
 }
 
-void MultiDomainRouteManager::ApplyDomainStrategyNow(int subdomainId) {
-    std::lock_guard<std::mutex> lock(mtx);
+// 立即应用（重建）某子域的策略对象（强制重建）
+void MultiDomainRouteManager::ApplyDomainStrategyNow(int subdomainId,std::string soPath) {
+    // std::lock_guard<std::mutex> lock(mtx);
     // Force rebuild the strategy object
     domainStrategyObj.erase(subdomainId);
     // create now
     RouteStrategyType type = defaultStrategy;
     if (domainStrategyMap.count(subdomainId)) type = domainStrategyMap[subdomainId];
-    if (net && net->m_routeFactory) {
-        auto ptr = net->m_routeFactory->CreateStrategy(type);
+    if (net && net->GetRouteFactory()) {
+        std::unique_ptr<route::RouteStrategy> ptr;
+        if(type<99){
+            ptr = net->GetRouteFactory()->CreateStrategy(type);
+        }else{
+            ptr = net->GetRouteFactory()->CreateUserStrategy(soPath);
+        }
         if (ptr) {
             domainStrategyObj[subdomainId] = std::move(ptr);
             std::cerr << "[MultiDomainRouteManager] Applied strategy for domain " << subdomainId << std::endl;
@@ -105,6 +111,9 @@ void MultiDomainRouteManager::ApplyDomainStrategyNow(int subdomainId) {
     }
 }
 
+// !!! Dont use this in Route function, because it have mutex which will slow down the route progress !!!!!!
+// !!! Dont use this in Route function, because it have mutex which will slow down the route progress !!!!!!
+// !!! Dont use this in Route function, because it have mutex which will slow down the route progress !!!!!!
 // 确保某个子域的路由对象已创建，延迟初始化，避免重复创建
 void MultiDomainRouteManager::ensureDomainStrategy(int subdomainId) {
     std::lock_guard<std::mutex> lock(mtx);
@@ -116,12 +125,12 @@ void MultiDomainRouteManager::ensureDomainStrategy(int subdomainId) {
             std::cerr << "[MultiDomainRouteManager] Error: network pointer is null" << std::endl;
             return;
         }
-        if (!net->m_routeFactory) {
+        if (!net->GetRouteFactory()) {
             std::cerr << "[MultiDomainRouteManager] Error: routeFactory is null" << std::endl;
             return;
         }
         try {
-            auto ptr = net->m_routeFactory->CreateStrategy(type);
+            auto ptr = net->GetRouteFactory()->CreateStrategy(type);
             if (ptr) domainStrategyObj[subdomainId] = std::move(ptr);
             else std::cerr << "[MultiDomainRouteManager] Warning: factory returned null for domain " << subdomainId << std::endl;
         } catch (...) {
@@ -145,21 +154,21 @@ bool MultiDomainRouteManager::Route(NODEID sourceId, NODEID sinkId, std::list<NO
         return false;
     }
 
-    int srcDomain = net->m_vAllNodes[sourceId].GetSubdomainId();
-    int dstDomain = net->m_vAllNodes[sinkId].GetSubdomainId();
+    int srcDomain = net->m_vAllNodes[sourceId].GetSubdomainId(); // 获取源节点所属子域ID,GetSubdomainId()函数待补充在Network.h
+    int dstDomain = net->m_vAllNodes[sinkId].GetSubdomainId(); // 获取目的节点所属子域ID
     if (srcDomain == dstDomain) {
         // 域内需求，自动调用对应子域协议
-        ensureDomainStrategy(srcDomain);
-        std::lock_guard<std::mutex> lock(mtx);
+        // ensureDomainStrategy(srcDomain);
+        // std::lock_guard<std::mutex> lock(mtx);
         auto it = domainStrategyObj.find(srcDomain);
         if (it == domainStrategyObj.end() || !(it->second)) {
-            std::cerr << "[MultiDomainRouteManager] Error: domain strategy object missing for domain " << srcDomain << std::endl;
+            // std::cerr << "[MultiDomainRouteManager] Error: domain strategy object missing for domain " << srcDomain << std::endl;
             return false;
         }
         return it->second->Route(sourceId, sinkId, nodeList, linkList);
     } else {
         // 跨域需求，自动调用BGP
-        std::lock_guard<std::mutex> lock(mtx);
+        // std::lock_guard<std::mutex> lock(mtx);
         if (!bgpStrategy) {
             std::cerr << "[MultiDomainRouteManager] Error: BGP strategy not set" << std::endl;
             return false;

@@ -71,10 +71,19 @@
                         <a class="nav-link" href="#" id="inputInfoLink">输入信息</a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link" href="/topology-config.html">网络拓扑配置</a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link" href="/sim.html" id="simulationResultLink">仿真结果</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#" id="relayPathLink">中继路径</a>
+                        <a class="nav-link" href="/routeCode.html" id="relayPathLink">路由策略</a>
+                    </li>
+		    <li class="nav-item">
+                        <a class="nav-link" href="/schedCode.html" id="relayPathLink">调度策略</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/history.html" id="relayPathLink">历史仿真</a>
                     </li>
                 </ul>
             </div>
@@ -88,6 +97,7 @@
                 <h5 class="card-title mb-0">首页操作</h5>
                 <button id="simStart" class="btn btn-primary ms-3">启动</button>
                 <button id="simReset" class="btn btn-primary ms-3">重置</button>
+                <button id="simAllStart" class="btn btn-primary ms-3">一键启动</button>
             </div>
             <!-- 右侧按钮 -->
             <div class="d-flex ms-auto">
@@ -103,14 +113,20 @@
             <div class="d-flex justify-content-between w-100">
                 <!-- 最短路径优先 -->
                 <div class="form-check form-check-inline w-50">
-                    <input class="form-check-input" type="radio" name="routingAlgorithm" id="shortestPath" value="shortestPath" checked>
+                    <input class="form-check-input" type="radio" name="routingAlgorithm" id="shortestPath" value=0 checked>
                     <label class="form-check-label" for="shortestPath">最短路径优先</label>
                 </div>
                 
                 <!-- 密钥速率优先 -->
                 <div class="form-check form-check-inline w-50">
-                    <input class="form-check-input" type="radio" name="routingAlgorithm" id="keyRate" value="keyRate">
+                    <input class="form-check-input" type="radio" name="routingAlgorithm" id="keyRate" value=1>
                     <label class="form-check-label" for="keyRate">密钥速率优先</label>
+                </div>
+
+                <!-- 密钥速率优先 -->
+                <div class="form-check form-check-inline w-50">
+                    <input class="form-check-input" type="radio" name="routingAlgorithm" id="customRoute" value=2>
+                    <label class="form-check-label" for="customRoute">自定义路由</label>
                 </div>
             </div>
         </div>
@@ -121,14 +137,20 @@
             <div class="d-flex justify-content-between w-100">
                 <!-- 最小任务剩余时间 -->
                 <div class="form-check form-check-inline w-50">
-                    <input class="form-check-input" type="radio" name="schedulingAlgorithm" id="minRemainingTime" value="minRemainingTime" checked>
+                    <input class="form-check-input" type="radio" name="schedulingAlgorithm" id="minRemainingTime" value=0 checked>
                     <label class="form-check-label" for="minRemainingTime">最小任务剩余时间</label>
                 </div>
     
                 <!-- 平均密钥 -->
                 <div class="form-check form-check-inline w-50">
-                    <input class="form-check-input" type="radio" name="schedulingAlgorithm" id="avgKeyRate" value="avgKeyRate">
+                    <input class="form-check-input" type="radio" name="schedulingAlgorithm" id="avgKeyRate" value=1>
                     <label class="form-check-label" for="avgKeyRate">平均密钥</label>
+                </div>
+
+                <!-- 平均密钥 -->
+                <div class="form-check form-check-inline w-50">
+                    <input class="form-check-input" type="radio" name="schedulingAlgorithm" id="customSched" value=2>
+                    <label class="form-check-label" for="avgKeyRate">自定义调度</label>
                 </div>
             </div>
         </div>
@@ -146,6 +168,13 @@
     <div id="result" class="result">
         <div id="result-header"></div>
         <div id="result-content" class="result-content"></div>
+        
+        <div id="pagination-controls" class="d-flex justify-content-center mt-3">
+            <button id="firstPage" class="btn btn-secondary me-2">首页</button>
+            <div id="pageNumbers" class="d-flex"></div>
+            <button id="lastPage" class="btn btn-secondary ms-2">尾页</button>
+        </div>
+        
     </div>
 
     <!-- 选择拓扑和需求操作 -->
@@ -198,33 +227,107 @@
 
 <script>
     const apiBaseUrl = "/api/v1";
+    const limit = 1000; // 每页 1000 条数据
+    let currentPage = 1;
+    let totalPages = 1; // 总页数
+    let currentDatasType="links"
 
     // 获取拓扑信息
     document.getElementById('getLinksBtn').addEventListener('click', async () => {
-        const response = await fetch(`${apiBaseUrl}/links`);
+        // const response = await fetch(`${apiBaseUrl}/links`);
+        // const data = await response.json();
+        // displayLinks(data.items);
+        currentDatasType="links";
+        currentPage=1;
+        fetchData()
+    });
+
+    async function fetchData() {
+    try {
+        const offset = (currentPage - 1) * limit;
+        const response = await fetch(`${apiBaseUrl}/`+currentDatasType+`?offset=${offset}&limit=${limit}`);
         const data = await response.json();
-        displayLinks(data.items);
+        totalPages = Math.ceil(data.count / limit); // 计算总页数
+        if(currentDatasType=="links"){
+            displayLinks(data.items);
+        }else if(currentDatasType=="demands"){
+            displayDemands(data.items);
+        }
+        updatePagination();
+    } catch (error) {
+        console.error("获取需求信息失败:", error);
+    }
+    }
+
+    document.getElementById('firstPage').addEventListener('click', () => {
+        if (currentPage !== 1) {
+            currentPage = 1;
+            fetchData();
+        }
+    });
+    document.getElementById('lastPage').addEventListener('click', () => {
+        if (currentPage !== totalPages) {
+            currentPage = totalPages;
+            fetchData();
+        }
     });
 
     // 获取需求信息
     document.getElementById('getDemandsBtn').addEventListener('click', async () => {
-        const response = await fetch(`${apiBaseUrl}/demands`);
-        const data = await response.json();
-        displayDemands(data.items);
+        // const response = await fetch(`${apiBaseUrl}/demands`);
+        // const data = await response.json();
+        // displayDemands(data.items);
+        
+        currentDatasType="demands";
+        currentPage=1;
+        fetchData()
     });
 
-    //启动
-    document.getElementById('simStart').addEventListener('click', async function() {
+    //一键启动
+    document.getElementById('simAllStart').addEventListener('click', async function() {
         // 获取路由算法选择
-        let routingAlgorithm = document.querySelector('input[name="routingAlgorithm"]:checked').value;
+        let routingAlgorithmParam = document.querySelector('input[name="routingAlgorithm"]:checked').value;
         let schedulingAlgorithm = document.querySelector('input[name="schedulingAlgorithm"]:checked').value;
 
         // 将路由算法和调度算法参数转换为0或1
-        let routingAlgorithmParam = (routingAlgorithm === 'shortestPath') ? 0 : 1;
+        // let routingAlgorithmParam = (routingAlgorithm === 'shortestPath') ? 0 : 1;
         let schedulingAlgorithmParam = (schedulingAlgorithm === 'minRemainingTime') ? 0 : 1;
 
         // 构造请求 URL，使用查询参数传递数据
-        const url = `${apiBaseUrl}/sim/start?routingAlgorithm=${routingAlgorithmParam}&schedulingAlgorithm=${schedulingAlgorithmParam}`;
+        const url = `${apiBaseUrl}/sim/allStart?routingAlgorithm=${routingAlgorithmParam}&schedulingAlgorithm=${schedulingAlgorithmParam}`;
+
+        try {
+            // 发起POST请求（使用POST方法，通过查询参数传递）
+            const response = await fetch(url, {
+                method: 'POST'  // 使用GET方法
+            });
+
+            // 检查响应状态码
+            if (response.status === 200) {
+                // const data = await response.json(); // 解析返回的JSON数据（如果需要）
+                // console.log('Success:', data);
+                alert('启动成功');
+            } else {
+                alert('启动失败');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('请求失败');
+        }
+    });
+
+    //单个启动
+    document.getElementById('simStart').addEventListener('click', async function() {
+        // 获取路由算法选择
+        let routingAlgorithmParam = document.querySelector('input[name="routingAlgorithm"]:checked').value;
+        let schedulingAlgorithmParam = document.querySelector('input[name="schedulingAlgorithm"]:checked').value;
+
+        // 将路由算法和调度算法参数转换为0或1
+        // let routingAlgorithmParam = (routingAlgorithm === 'shortestPath') ? 0 : 1;
+        // let schedulingAlgorithmParam = (schedulingAlgorithm === 'minRemainingTime') ? 0 : 1;
+
+        // 构造请求 URL，使用查询参数传递数据
+        const url = `${apiBaseUrl}/sim/oneStart?routingAlgorithm=${routingAlgorithmParam}&schedulingAlgorithm=${schedulingAlgorithmParam}`;
 
         try {
             // 发起POST请求（使用POST方法，通过查询参数传递）
@@ -275,47 +378,25 @@
     
 
     // 显示拓扑信息表格
-    let linkData = []; // 全部链接数据
-    let linkPageSize = 1000; // 每次加载的数量
-    let linkOffset = 0; // 当前加载偏移量
-
     function displayLinks(data) {
-        linkData = data;  // 全部链接数据
-        const headerDiv = document.getElementById('result-header');
+        const headerDiv=document.getElementById('result-header');
         const contentDiv = document.getElementById('result-content');
-        let header = '<h3>拓扑信息</h3>';
-        contentDiv.innerHTML = header;
-        
-        // 初始加载部分数据
-        loadLinkItems();
-
-        // 添加滚动事件监听器
-        contentDiv.addEventListener('scroll', async () => {
-            if (contentDiv.scrollTop + contentDiv.clientHeight >= contentDiv.scrollHeight - 5) {
-                linkOffset += linkPageSize;
-                loadLinkItems();
-            }
-        });
-    }
-
-    function loadLinkItems() {
-        const contentDiv = document.getElementById('result-content');
+        let header= '<h3>拓扑信息</h3>'
         let table = `<table class="table table-bordered">
-                        <thead>
-                            <tr>
-                                <th>Link ID</th>
-                                <th>Source ID</th>
-                                <th>Sink ID</th>
-                                <th>QKD Rate</th>
-                                <th>Delay</th>
-                                <th>Bandwidth</th>
-                                <th>Fault Time</th>
-                                <th>Weight</th>
-                            </tr>
-                        </thead>
-                        <tbody>`;
-        const itemsToShow = linkData.slice(linkOffset, linkOffset + linkPageSize);
-        itemsToShow.forEach(link => {
+                         <thead>
+                             <tr>
+                                 <th>Link ID</th>
+                                 <th>Source ID</th>
+                                 <th>Sink ID</th>
+                                 <th>QKD Rate</th>
+                                 <th>Delay</th>
+                                 <th>Bandwidth</th>
+                                 <th>Fault Time</th>
+                                 <th>Weight</th>
+                             </tr>
+                         </thead>
+                         <tbody>`;
+        data.forEach(link => {
             table += `
                 <tr>
                     <td>${link.linkId}</td>
@@ -329,53 +410,32 @@
                 </tr>`;
         });
         table += `</tbody></table>`;
-        contentDiv.innerHTML += table; // 追加内容
+        headerDiv.innerHTML=header;
+        contentDiv.innerHTML = table;
     }
 
-
-    let demandData = []; // 全部需求数据
-    let demandPageSize = 1000; // 每次加载的数量
-    let demandOffset = 0; // 当前加载偏移量
-
+    // 显示需求信息表格
     function displayDemands(data) {
-        demandData = data;  // 全部需求数据
-        const headerDiv = document.getElementById('result-header');
+        const headerDiv=document.getElementById('result-header');
         const contentDiv = document.getElementById('result-content');
-        let header = '<h3>需求信息</h3>';
-        contentDiv.innerHTML = header;
-
-        // 初始加载部分数据
-        loadDemandItems();
-
-        // 添加滚动事件监听器
-        contentDiv.addEventListener('scroll', async () => {
-            if (contentDiv.scrollTop + contentDiv.clientHeight >= contentDiv.scrollHeight - 5) {
-                demandOffset += demandPageSize;
-                loadDemandItems();
-            }
-        });
-    }
-
-    function loadDemandItems() {
-        const contentDiv = document.getElementById('result-content');
+        let header='<h3>需求信息</h3>'
         let table = `<table class="table table-bordered">
-                        <thead>
-                            <tr>
-                                <th>Demand ID</th>
-                                <th>Source ID</th>
-                                <th>Sink ID</th>
-                                <th>Arrive Time</th>
-                                <th>Complete Time</th>
-                                <th>Demand Volume</th>
-                                <th>Remaining Volume</th>
-                                <th>Delivered Volume</th>
-                                <th>All Delivered</th>
-                                <th>Route Failed</th>
-                            </tr>
-                        </thead>
-                        <tbody>`;
-        const itemsToShow = demandData.slice(demandOffset, demandOffset + demandPageSize);
-        itemsToShow.forEach(demand => {
+                         <thead>
+                             <tr>
+                                 <th>Demand ID</th>
+                                 <th>Source ID</th>
+                                 <th>Sink ID</th>
+                                 <th>Arrive Time</th>
+                                 <th>Complete Time</th>
+                                 <th>Demand Volume</th>
+                                 <th>Remaining Volume</th>
+                                 <th>Delivered Volume</th>
+                                 <th>All Delivered</th>
+                                 <th>Route Failed</th>
+                             </tr>
+                         </thead>
+                         <tbody>`;
+        data.forEach(demand => {
             table += `
                 <tr>
                     <td>${demand.demandId}</td>
@@ -391,7 +451,8 @@
                 </tr>`;
         });
         table += `</tbody></table>`;
-        contentDiv.innerHTML += table; // 追加内容
+        headerDiv.innerHTML=header;
+        contentDiv.innerHTML = table;
     }
 
     // 获取拓扑文件列表并显示
@@ -433,8 +494,11 @@
         const response=await fetch(`${apiBaseUrl}/select/link/${fileName}`, { method: 'POST' });
         alert(`已选择拓扑文件: ${fileName}`);
         loadLinkFiles(); // 更新文件列表
-        const data = await response.json();
-        displayLinks(data.items);
+        // const data = await response.json();
+        // displayLinks(data.items);
+        currentDatasType="links";
+        currentPage=1;
+        fetchData()
     }
 
     // 选择需求文件
@@ -442,8 +506,37 @@
         const response=await fetch(`${apiBaseUrl}/select/demand/${fileName}`, { method: 'POST' });
         alert(`已选择需求文件: ${fileName}`);
         loadDemandFiles(); // 更新文件列表
-        const data = await response.json();
-        displayDemands(data.items);
+        // const data = await response.json();
+        // displayDemands(data.items);
+        currentDatasType="demands";
+        currentPage=1;
+        fetchData()
+    }
+
+    function updatePagination() {
+        const pageNumbersDiv = document.getElementById('pageNumbers');
+        pageNumbersDiv.innerHTML = "";
+
+        const maxPagesToShow = 5; // 最多显示 5 个页码
+        let startPage = Math.max(1, currentPage - 2);
+        let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+
+        if (endPage - startPage < maxPagesToShow - 1) {
+            startPage = Math.max(1, endPage - maxPagesToShow + 1);
+        }
+
+        for (let i = startPage; i <= endPage; i++) {
+            const pageBtn = document.createElement('button');
+            pageBtn.className = `btn ${i === currentPage ? 'btn-primary' : 'btn-light'} mx-1`;
+            pageBtn.innerText = i;
+            pageBtn.addEventListener('click', () => {
+                if (currentPage !== i) {
+                    currentPage = i;
+                    fetchData();
+                }
+            });
+            pageNumbersDiv.appendChild(pageBtn);
+        }
     }
 
     

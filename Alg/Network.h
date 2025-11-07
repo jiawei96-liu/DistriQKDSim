@@ -9,10 +9,23 @@
 #include "Alg/Sched/SchedFactory.h"
 //#include "KeyManager.h"
 #include <functional>
+#include "Alg/Route/MultiDomainRouteManager.h"
 #include <condition_variable>
 #include <mutex>
+#include <thread>
 
 class SimDao;
+
+class DomainInfo{
+public:
+    DomainInfo(int _nodeNum,int _edgeNum,int _gwNum,int _crossDomainEdgeNum):nodeNum(_nodeNum)
+    ,edgeNum(_edgeNum),gateWayNum(_gwNum),crossDomainEdgeNum(_crossDomainEdgeNum){}
+    ~DomainInfo()=default;
+    int nodeNum;
+    int edgeNum;
+    int gateWayNum;
+    int crossDomainEdgeNum;
+};
 
 class CNetwork
     
@@ -23,6 +36,7 @@ public:
     CNetwork(void);
     ~CNetwork(void);
     //data structure for input
+    vector<DomainInfo> m_vDomainInfo;
     vector<CNode> m_vAllNodes;	// �洢���������нڵ���б�
     vector<CLink> m_vAllLinks;	// �洢������������·���б�
     vector<CDemand> m_vAllDemands;	// �洢����������������б�
@@ -57,11 +71,15 @@ public:
 private:
     std::unique_ptr<route::RouteFactory> m_routeFactory;    //·�ɲ��Թ���
     std::unique_ptr<route::RouteStrategy> m_routeStrategy;  //��ǰ·�ɲ���
+    std::shared_ptr<route::MultiDomainRouteManager> m_multiDomainRouteMgr; // 多域路由控制器
 
     std::unique_ptr<sched::SchedFactory> m_schedFactory;    //·�ɲ��Թ���
     std::unique_ptr<sched::SchedStrategy> m_schedStrategy;  //��ǰ·�ɲ���
     SimResultStore simResStore;
     SimDao* simDao;
+    
+    // 记录已完成端到端预约、准备在下一步转发的需求集合
+    std::unordered_set<DEMANDID> m_readyToRelay;
 
 
 public:
@@ -91,6 +109,10 @@ public:
 
     void RunInBackGround();
 
+    // Accessors for components that may be used by controllers or external modules
+    route::RouteFactory* GetRouteFactory() { return m_routeFactory.get(); }
+    route::RouteStrategy* GetRouteStrategy() { return m_routeStrategy.get(); }
+    std::shared_ptr<route::MultiDomainRouteManager> GetMultiDomainRouteMgr() { return m_multiDomainRouteMgr; }
 
     //common route algorithms
     std::function<bool(NODEID, NODEID, list<NODEID>&, list<LINKID>&)> currentRouteAlg;
@@ -115,7 +137,7 @@ public:
     void InitRelayPath(DEMANDID demandId);
     void InitRelayPath();//for all demands
 
-    // void InitRelayPath(size_t max_threads); // �������İ汾
+    void InitRelayPathByMultiThread(size_t max_threads=std::thread::hardware_concurrency()); // �������İ汾
 
     void InitLinkDemand();
 
@@ -132,6 +154,9 @@ public:
     void RelayForOneHop(TIME executeTime, map<NODEID, map<DEMANDID, VOLUME>>& relayDemands); // ִ��һ������ת���������м̵���һ��
     void UpdateRemainingKeys(TIME executionTime);	// ������·��ʣ�����Կ��
     void UpdateRemainingKeys(TIME executionTime, TIME m_dSimTime);	// ������·��ʣ�����Կ��
+        // retry reservations helpers (used when link key pools change)
+        void ReattemptReservationsForLink(LINKID linkId);
+        bool AttemptReserveForDemandFromNode(DEMANDID demandid, NODEID fromNode);
     void SimTimeForward(TIME executionTime);	// ��ģ��ʱ���ƽ�ָ����ִ��ʱ��
 
     //main process
@@ -185,6 +210,12 @@ public:
         // {
         //     return this->AverageKeyScheduling(nodeId, relayDemands);
         // };
+    }
+
+    // 设置为端到端预约调度策略（两阶段预约 + 提交/释放）
+    void setReservationSched()
+    {
+        m_schedStrategy=std::move(m_schedFactory->CreateStrategy(sched::SchedType_Reserve));
     }
 
     void setOspfRoute()
