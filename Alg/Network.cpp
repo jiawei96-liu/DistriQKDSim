@@ -1,6 +1,7 @@
-﻿#include <fstream>
+#include <fstream>
 #include <sstream>
 #include "Network.h"
+#include "Alg/Route/MinTimeStrategy.h"
 
 // 从 network_full.csv 读取链路和节点属性，自动补全节点信息
 void CNetwork::LoadNetworkFullCSV(const std::string& filename) {
@@ -896,6 +897,58 @@ void CNetwork::ShowDemandPaths()
 // //    }
 // }
 
+// 为指定需求 demandId 动态计算路由路径（用于MinTime等"随到随算"策略）
+void CNetwork::DynamicRouteDemand(DEMANDID demandId) {
+    // 检查需求是否已到达
+    if (m_vAllDemands[demandId].GetArriveTime() > m_dSimTime + SMALLNUM) {
+        return; // 需求尚未到达，不进行路由计算
+    }
+
+    NODEID sourceId = m_vAllDemands[demandId].GetSourceId();
+    NODEID sinkId = m_vAllDemands[demandId].GetSinkId();
+    list<NODEID> nodeList;
+    list<LINKID> linkList;
+
+    // 调用路由函数，优先使用多域路由控制器；若不可用则回退到单一路由策略
+    bool routed = false;
+    if (m_multiDomainRouteMgr) {
+        routed = m_multiDomainRouteMgr->Route(sourceId, sinkId, nodeList, linkList);
+    }
+
+    NODEID sourceId = m_vAllDemands[demandId].GetSourceId();
+    NODEID sinkId = m_vAllDemands[demandId].GetSinkId();
+    list<NODEID> nodeList;
+    list<LINKID> linkList;
+
+    // 调用路由函数，优先使用多域路由控制器；若不可用则回退到单一路由策略
+    bool routed = false;
+    if (m_multiDomainRouteMgr) {
+        routed = m_multiDomainRouteMgr->Route(sourceId, sinkId, nodeList, linkList);
+    }
+    if (!routed && m_routeStrategy) {
+        // 对于MinTime策略，需要传递数据量参数
+        // 检查是否是MinTime策略
+        route::MinTimeStrategy* minTimeStrategy = dynamic_cast<route::MinTimeStrategy*>(m_routeStrategy.get());
+        if (minTimeStrategy) {
+            // 获取需求数据量
+            VOLUME demandVolume = m_vAllDemands[demandId].GetDemandVolume();
+            // 使用带数据量参数的路由方法
+            routed = minTimeStrategy->Route(sourceId, sinkId, nodeList, linkList, demandVolume);
+        } else {
+            // 使用普通路由方法
+            routed = m_routeStrategy->Route(sourceId, sinkId, nodeList, linkList);
+        }
+    }
+    
+    if (routed) {
+        // 初始化新的中继路径
+        m_vAllDemands[demandId].InitRelayPath(nodeList, linkList);
+    } else {
+        // 路由失败，标记需求
+        m_vAllDemands[demandId].CheckRoutedFailed();
+    }
+}
+
 // 为指定需求 demandId 初始化中继路径。如果需求已经被路由，则跳过此操作（多线程）
 void CNetwork::InitRelayPath(DEMANDID demandId) {
     NODEID sourceId = m_vAllDemands[demandId].GetSourceId();
@@ -924,25 +977,44 @@ void CNetwork::InitRelayPath(DEMANDID demandId) {
         m_vAllDemands[demandId].m_Path.Clear();
     }
 
-    // 调用路由函数，优先使用多域路由控制器；若不可用则回退到单一路由策略
-    bool routed = false;
-    if (m_multiDomainRouteMgr) {
-        routed = m_multiDomainRouteMgr->Route(sourceId, sinkId, nodeList, linkList);
-    }
-    if (!routed && m_routeStrategy) {
-        routed = m_routeStrategy->Route(sourceId, sinkId, nodeList, linkList);
-    }
-    if (routed) {
-        if (m_dSimTime > 0) {
-            // 恢复源节点上的待传输数据量，以进行重传
-            VOLUME RemainingVolume = m_vAllDemands[demandId].GetDemandVolume() - m_vAllDemands[demandId].GetDeliveredVolume();
-            CNode& sourceNode = m_vAllNodes[sourceId];
-            std::lock_guard<std::mutex> lock(sourceNode.m_mutex); // 加锁
-            sourceNode.m_lCarriedDemands[demandId] = RemainingVolume;
+    // 对于MinTime策略，采用"随到随算"的方式，只有在需求到达时才计算路径
+    route::MinTimeStrategy* minTimeStrategy = dynamic_cast<route::MinTimeStrategy*>(m_routeStrategy.get());
+    
+    // 如果不是MinTime策略，或者是在仿真开始时（m_dSimTime <= 0），则进行路径计算
+    if (!minTimeStrategy || m_dSimTime <= 0) {
+        // 调用路由函数，优先使用多域路由控制器；若不可用则回退到单一路由策略
+        bool routed = false;
+        if (m_multiDomainRouteMgr) {
+            routed = m_multiDomainRouteMgr->Route(sourceId, sinkId, nodeList, linkList);
         }
+        if (!routed && m_routeStrategy) {
+            // 对于MinTime策略，需要传递数据量参数
+            if (minTimeStrategy) {
+                // 获取需求数据量
+                VOLUME demandVolume = m_vAllDemands[demandId].GetDemandVolume();
+                // 使用带数据量参数的路由方法
+                routed = minTimeStrategy->Route(sourceId, sinkId, nodeList, linkList, demandVolume);
+            } else {
+                // 使用普通路由方法
+                routed = m_routeStrategy->Route(sourceId, sinkId, nodeList, linkList);
+            }
+        }
+        if (routed) {
+            if (m_dSimTime > 0) {
+                // 恢复源节点上的待传输数据量，以进行重传
+                VOLUME RemainingVolume = m_vAllDemands[demandId].GetDemandVolume() - m_vAllDemands[demandId].GetDeliveredVolume();
+                CNode& sourceNode = m_vAllNodes[sourceId];
+                std::lock_guard<std::mutex> lock(sourceNode.m_mutex); // 加锁
+                sourceNode.m_lCarriedDemands[demandId] = RemainingVolume;
+            }
 
-        // 初始化新的中继路径
-        m_vAllDemands[demandId].InitRelayPath(nodeList, linkList);
+            // 初始化新的中继路径
+            m_vAllDemands[demandId].InitRelayPath(nodeList, linkList);
+        }
+    } else {
+        // 对于MinTime策略且在仿真过程中，不预先计算路径，等待需求到达时再计算
+        // 可以在这里做一些初始化工作，如标记需求未路由等
+        // 但通常保持路径为空，直到需求真正需要路由时再计算
     }
 }
 
@@ -2076,6 +2148,22 @@ TIME CNetwork::OneTimeRelay()
 
     std::cout << "Current Time: " << m_dSimTime << std::endl;
     // std::cout << "Current FaultTime: " << FaultTime << std::endl;
+
+    // 检查是否使用MinTime策略，如果是，则在需求到达时动态计算路由
+    route::MinTimeStrategy* minTimeStrategy = dynamic_cast<route::MinTimeStrategy*>(m_routeStrategy.get());
+    
+    if (minTimeStrategy) {
+        // 遍历所有需求，检查是否有新到达且尚未路由的需求
+        for (DEMANDID demandId = 0; demandId < m_vAllDemands.size(); demandId++) {
+            // 检查需求是否已到达且尚未路由
+            if (m_vAllDemands[demandId].GetArriveTime() <= m_dSimTime + SMALLNUM && 
+                m_vAllDemands[demandId].m_Path.m_lTraversedNodes.empty() &&
+                !m_vAllDemands[demandId].GetRoutedFailed()) {
+                // 动态计算路由
+                DynamicRouteDemand(demandId);
+            }
+        }
+    }
 
     // 检查故障并进行重路由
     // 这里需要注意，故障生成需要按照faultTime逐次进行

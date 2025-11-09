@@ -94,7 +94,7 @@ public:
 
     TIME CurrentTime();	// ��ȡ��ǰģ��ʱ��
     UINT CurrentStep();
-    void MoveSimTime(TIME executeTime);	// �ƽ�ģ��ʱ�䲢������Ӧ���¼�
+    void MoveSimTime(TIME executeTime);	// �ƽ�ģ��ʱ�������Ӧ���¼�
 
     void InitKeyManagerOverLink(LINKID linkId);	// Ϊ�ض���·��ʼ����Կ������
 
@@ -133,11 +133,14 @@ public:
 
 
 public:
-    //functions for relay routing	��ʼ��ָ�����������������м�·��
+    //functions for relay routing	ʼָм·
     void InitRelayPath(DEMANDID demandId);
     void InitRelayPath();//for all demands
 
-    void InitRelayPathByMultiThread(size_t max_threads=std::thread::hardware_concurrency()); // �������İ汾
+    // 添加动态路由计算方法，用于MinTime策略的"随到随算"
+    void DynamicRouteDemand(DEMANDID demandId);
+
+    void InitRelayPathByMultiThread(size_t max_threads=std::thread::hardware_concurrency()); // İ汾
 
     void InitLinkDemand();
 

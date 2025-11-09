@@ -6,6 +6,8 @@
 #include "CustomRouteStrategy.h"
 #include "OspfStrategy.h"
 #include "BgpStrategy.h"
+#include "MaxMinRateStrategy.h"
+#include "MinTimeStrategy.h"
 #include <dlfcn.h>
 #include <memory>
 #include "Alg/Network.h"
@@ -80,6 +82,12 @@ std::unique_ptr<RouteStrategy> RouteFactory::CreateStrategy(RouteStrategyType ty
         cout << "自定义路由算法" << endl;
         unloadUserRouteStrategy();
         return loadUserCustomRouteStrategy(net);  //动态加载用户实现
+    } else if (type == RouteType_MaxMinRate) {
+        cout << "最大最小速率策略" << endl;
+        return std::make_unique<MaxMinRateStrategy>(net);
+    } else if (type == RouteType_MinTime) {
+        cout << "最小时间策略" << endl;
+        return std::make_unique<MinTimeStrategy>(net);
     } else {
         std::cerr << "Unknown strategy type: " << type << std::endl;
     }

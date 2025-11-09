@@ -1,4 +1,4 @@
-﻿// stdafx.h : include file for standard system include files,
+// stdafx.h : include file for standard system include files,
 // or project specific include files that are used frequently, but
 // are changed infrequently
 
@@ -59,6 +59,7 @@ const TIME IMPOSSIBLETIME = -0.1;
 const UINT IMPOSSIBLENODE = -1;
 const EVENTID IMPOSSIBLEEVENT = -1;
 const double THRESHOLD = 0.01;
+const double KEY_RATE_TO_NEGOTIATION_RATIO = 0.1;  // 密钥速率与协商数据速率的比例
 
 // 函数指针类型
 typedef bool (CNetwork::*CalcuPath)(NODEID, NODEID, std::list<NODEID>&, std::list<LINKID>&);

@@ -1,4 +1,4 @@
-﻿#include "Link.h"
+#include "Link.h"
 #include <algorithm>
 
 // CLink::CLink(void)
@@ -236,5 +236,31 @@ void CLink::AddToWaitingQueue(DEMANDID demandid, VOLUME vol, TIME arriveTime, NO
     WaitingRequest req{demandid, vol, arriveTime, originNode};
     m_waitingQueue.push_back(req);
 }
+
+
+//---------------------------------添加部分---------------------------------
+void CLink::SetClassicalBandwidth(WEIGHT weight)
+{
+    m_dClassicalBandwidth = weight * m_dBandwidth; // 使用 weight 参数作为比例因子
+}
+
+
+RATE CLink::GetClassicalBandwidth()
+{
+    return m_dClassicalBandwidth;
+}
+
+
+void CLink::SetNegotiationBandwidth()
+{
+    m_dNegotiationBandwidth = m_dBandwidth - m_dClassicalBandwidth;
+}
+
+
+void CLink::SetKeyRateCoefficient()
+{
+    m_KeyManager.SetKeyRate(KEY_RATE_TO_NEGOTIATION_RATIO * m_dNegotiationBandwidth);  // 设置密钥管理器的密钥生成速率为协商带宽的比例
+}
+//-------------------------------------------------------------------------
 
 

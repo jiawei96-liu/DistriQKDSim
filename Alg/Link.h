@@ -32,6 +32,17 @@ private:
 
     int m_iSubdomainId = 0; // 子域标识，默认0
 
+
+    //---------------------------------添加部分---------------------------------
+    // 经典信道属性
+    RATE m_dClassicalBandwidth;      // 经典信道总带宽
+    RATE m_dClassicalDataRate;            // 经典数据传输速率
+
+    // 密钥协商信道属性
+    RATE m_dNegotiationBandwidth;        // 协商信道总带宽
+    RATE m_dNegotiationDataRate;              // 协商数据传输速率
+    //-------------------------------------------------------------------------
+
 private: //data structure for algorithms
     WEIGHT m_dWeight; // 链路的权重，用于路径选择算法中
 public:
@@ -84,6 +95,18 @@ public:
     VOLUME GetAvaialbeKeys();	// 获取链路上可用的密钥数量
     void UpdateRemainingKeys(TIME executionTime);	// 根据执行时间更新链路上剩余的密钥量
     void UpdateRemainingKeys(TIME executionTime, TIME m_dSimTime);	// 根据执行时间更新链路上剩余的密钥量
+
+    //---------------------------------添加部分---------------------------------
+    // 经典信道属性设置和获取
+    void SetClassicalBandwidth(WEIGHT weight);
+    RATE GetClassicalBandwidth();
+    
+    // 密钥协商信道属性设置和获取
+    void SetNegotiationBandwidth();
+
+    
+    void SetKeyRateCoefficient();
+    //-------------------------------------------------------------------------
 
     // reservation APIs (线程安全，内部使用 m_mutex)
     VOLUME GetAvailableForReservation();

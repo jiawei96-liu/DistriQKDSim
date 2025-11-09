@@ -48,6 +48,8 @@ typedef enum {
     RouteType_Custom,
     RouteType_demo,
     RouteType_MultiDomain,
+    RouteType_MaxMinRate,
+    RouteType_MinTime,
     RouteType_Unknown
 } RouteStrategyType;
 
