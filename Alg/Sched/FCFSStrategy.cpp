@@ -5,10 +5,6 @@
 
 using namespace sched;
 
-FCFSStrategy::FCFSStrategy(CNetwork* _net) {
-    net = _net;
-}
-
 /**
  * 先到先服务(FCFS)端到端密钥预约调度算法
  * 为指定节点调度中继需求，采用先到先服务的优先级策略，

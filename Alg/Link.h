@@ -103,6 +103,7 @@ public:
     
     // 密钥协商信道属性设置和获取
     void SetNegotiationBandwidth();
+    RATE GetNegotiationBandwidth();
 
     
     void SetKeyRateCoefficient();

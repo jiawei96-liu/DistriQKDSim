@@ -20,18 +20,14 @@ add_library(alg STATIC
     Route/OspfStrategy.cpp
     Route/BgpStrategy.cpp
     Route/MultiDomainRouteManager.cpp
+    Route/MinTimeStrategy.cpp
+    Route/MaxMinRateStrategy.cpp
     Sched/AvgStrategy.cpp
     Sched/CustomSchedStrategy.cpp
     Sched/MinStrategy.cpp
     Sched/ReservationStrategy.cpp
     Sched/SchedFactory.cpp
-    Route/RouteFactory.cpp
-    Route/KeyRateFibStrategy.cpp
-    Sched/AvgStrategy.cpp
-    Sched/CustomSchedStrategy.cpp
-    Sched/MinStrategy.cpp
-    Sched/SchedFactory.cpp
-    # main_new.cpp
+    Sched/FCFSStrategy.cpp
 )
 
 # 设置包含目录

@@ -3,6 +3,8 @@
 #include "Network.h"
 #include "Alg/Route/MinTimeStrategy.h"
 
+using namespace route;
+
 // 从 network_full.csv 读取链路和节点属性，自动补全节点信息
 void CNetwork::LoadNetworkFullCSV(const std::string& filename) {
     std::ifstream file(filename);
@@ -914,21 +916,10 @@ void CNetwork::DynamicRouteDemand(DEMANDID demandId) {
     if (m_multiDomainRouteMgr) {
         routed = m_multiDomainRouteMgr->Route(sourceId, sinkId, nodeList, linkList);
     }
-
-    NODEID sourceId = m_vAllDemands[demandId].GetSourceId();
-    NODEID sinkId = m_vAllDemands[demandId].GetSinkId();
-    list<NODEID> nodeList;
-    list<LINKID> linkList;
-
-    // 调用路由函数，优先使用多域路由控制器；若不可用则回退到单一路由策略
-    bool routed = false;
-    if (m_multiDomainRouteMgr) {
-        routed = m_multiDomainRouteMgr->Route(sourceId, sinkId, nodeList, linkList);
-    }
     if (!routed && m_routeStrategy) {
         // 对于MinTime策略，需要传递数据量参数
         // 检查是否是MinTime策略
-        route::MinTimeStrategy* minTimeStrategy = dynamic_cast<route::MinTimeStrategy*>(m_routeStrategy.get());
+        MinTimeStrategy* minTimeStrategy = dynamic_cast<MinTimeStrategy*>(m_routeStrategy.get());
         if (minTimeStrategy) {
             // 获取需求数据量
             VOLUME demandVolume = m_vAllDemands[demandId].GetDemandVolume();

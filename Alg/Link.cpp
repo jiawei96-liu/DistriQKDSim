@@ -256,10 +256,14 @@ void CLink::SetNegotiationBandwidth()
     m_dNegotiationBandwidth = m_dBandwidth - m_dClassicalBandwidth;
 }
 
+RATE CLink::GetNegotiationBandwidth()
+{
+    return m_dNegotiationBandwidth;
+}
 
 void CLink::SetKeyRateCoefficient()
 {
-    m_KeyManager.SetKeyRate(KEY_RATE_TO_NEGOTIATION_RATIO * m_dNegotiationBandwidth);  // 设置密钥管理器的密钥生成速率为协商带宽的比例
+    m_KeyManager.SetKeyRate(KEY_RATE_TO_NEGOTIATION_RATIO * m_dNegotiationBandwidth);
 }
 //-------------------------------------------------------------------------
 

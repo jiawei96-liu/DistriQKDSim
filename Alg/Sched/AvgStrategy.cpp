@@ -194,7 +194,7 @@ TIME AvgStrategy::Sched(NODEID nodeId, map<DEMANDID, VOLUME> &relayDemands) {
             link.SetNegotiationBandwidth();  // 设置密钥协商带宽为剩余带宽
             //----------------------------------------
             // 计算需要等待的密钥生成时间
-            tempTime = (needVolume - availableKeyVolume) / link.m_Keymanager.GetKeyRate();
+            tempTime = (needVolume - availableKeyVolume) / link.GetQKDRate();
         }
         
         // 用户可修改：可以调整最小执行时间限制
