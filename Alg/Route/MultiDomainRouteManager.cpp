@@ -87,12 +87,19 @@ void MultiDomainRouteManager::RemoveDomainStrategy(int subdomainId) {
 
 // 立即应用（重建）某子域的策略对象（强制重建）
 void MultiDomainRouteManager::ApplyDomainStrategyNow(int subdomainId,std::string soPath) {
-    // std::lock_guard<std::mutex> lock(mtx);
     // Force rebuild the strategy object
-    domainStrategyObj.erase(subdomainId);
+    {
+        std::lock_guard<std::mutex> lock(mtx);
+        domainStrategyObj.erase(subdomainId);
+    }
+    
     // create now
     RouteStrategyType type = defaultStrategy;
-    if (domainStrategyMap.count(subdomainId)) type = domainStrategyMap[subdomainId];
+    {
+        std::lock_guard<std::mutex> lock(mtx);
+        if (domainStrategyMap.count(subdomainId)) type = domainStrategyMap[subdomainId];
+    }
+    
     if (net && net->GetRouteFactory()) {
         std::unique_ptr<route::RouteStrategy> ptr;
         if(type<99){
@@ -101,6 +108,7 @@ void MultiDomainRouteManager::ApplyDomainStrategyNow(int subdomainId,std::string
             ptr = net->GetRouteFactory()->CreateUserStrategy(soPath);
         }
         if (ptr) {
+            std::lock_guard<std::mutex> lock(mtx);
             domainStrategyObj[subdomainId] = std::move(ptr);
             std::cerr << "[MultiDomainRouteManager] Applied strategy for domain " << subdomainId << std::endl;
         } else {
@@ -116,26 +124,35 @@ void MultiDomainRouteManager::ApplyDomainStrategyNow(int subdomainId,std::string
 // !!! Dont use this in Route function, because it have mutex which will slow down the route progress !!!!!!
 // 确保某个子域的路由对象已创建，延迟初始化，避免重复创建
 void MultiDomainRouteManager::ensureDomainStrategy(int subdomainId) {
+    // 先检查不加锁的情况下是否已经存在策略对象，避免不必要的加锁开销
+    if (domainStrategyObj.count(subdomainId) > 0) {
+        return; // 已经存在，直接返回
+    }
+    
+    // 只有在确实需要创建策略对象时才加锁
     std::lock_guard<std::mutex> lock(mtx);
-    if (domainStrategyObj.count(subdomainId) == 0) {
-        RouteStrategyType type = defaultStrategy;
-        if (domainStrategyMap.count(subdomainId)) type = domainStrategyMap[subdomainId];
-        // 通过工厂创建对应类型的路由对象
-        if (!net) {
-            std::cerr << "[MultiDomainRouteManager] Error: network pointer is null" << std::endl;
-            return;
-        }
-        if (!net->GetRouteFactory()) {
-            std::cerr << "[MultiDomainRouteManager] Error: routeFactory is null" << std::endl;
-            return;
-        }
-        try {
-            auto ptr = net->GetRouteFactory()->CreateStrategy(type);
-            if (ptr) domainStrategyObj[subdomainId] = std::move(ptr);
-            else std::cerr << "[MultiDomainRouteManager] Warning: factory returned null for domain " << subdomainId << std::endl;
-        } catch (...) {
-            std::cerr << "[MultiDomainRouteManager] Exception when creating strategy for domain " << subdomainId << std::endl;
-        }
+    // 再次检查，防止在获取锁的过程中其他线程已经创建了策略对象
+    if (domainStrategyObj.count(subdomainId) > 0) {
+        return;
+    }
+    
+    RouteStrategyType type = defaultStrategy;
+    if (domainStrategyMap.count(subdomainId)) type = domainStrategyMap[subdomainId];
+    // 通过工厂创建对应类型的路由对象
+    if (!net) {
+        std::cerr << "[MultiDomainRouteManager] Error: network pointer is null" << std::endl;
+        return;
+    }
+    if (!net->GetRouteFactory()) {
+        std::cerr << "[MultiDomainRouteManager] Error: routeFactory is null" << std::endl;
+        return;
+    }
+    try {
+        auto ptr = net->GetRouteFactory()->CreateStrategy(type);
+        if (ptr) domainStrategyObj[subdomainId] = std::move(ptr);
+        else std::cerr << "[MultiDomainRouteManager] Warning: factory returned null for domain " << subdomainId << std::endl;
+    } catch (...) {
+        std::cerr << "[MultiDomainRouteManager] Exception when creating strategy for domain " << subdomainId << std::endl;
     }
 }
 
@@ -154,21 +171,36 @@ bool MultiDomainRouteManager::Route(NODEID sourceId, NODEID sinkId, std::list<NO
         return false;
     }
 
-    int srcDomain = net->m_vAllNodes[sourceId].GetSubdomainId(); // 获取源节点所属子域ID,GetSubdomainId()函数待补充在Network.h
+    int srcDomain = net->m_vAllNodes[sourceId].GetSubdomainId(); // 获取源节点所属子域ID
     int dstDomain = net->m_vAllNodes[sinkId].GetSubdomainId(); // 获取目的节点所属子域ID
     if (srcDomain == dstDomain) {
         // 域内需求，自动调用对应子域协议
-        // ensureDomainStrategy(srcDomain);
-        // std::lock_guard<std::mutex> lock(mtx);
         auto it = domainStrategyObj.find(srcDomain);
         if (it == domainStrategyObj.end() || !(it->second)) {
-            // std::cerr << "[MultiDomainRouteManager] Error: domain strategy object missing for domain " << srcDomain << std::endl;
-            return false;
+            // 如果策略对象不存在，尝试创建它
+            RouteStrategyType type = defaultStrategy;
+            if (domainStrategyMap.count(srcDomain)) type = domainStrategyMap[srcDomain];
+            
+            if (net && net->GetRouteFactory()) {
+                std::unique_ptr<route::RouteStrategy> ptr = net->GetRouteFactory()->CreateStrategy(type);
+                if (ptr) {
+                    domainStrategyObj[srcDomain] = std::move(ptr);
+                    std::cerr << "[MultiDomainRouteManager] Auto-created strategy for domain " << srcDomain << std::endl;
+                } else {
+                    std::cerr << "[MultiDomainRouteManager] Error: failed to auto-create strategy for domain " << srcDomain << std::endl;
+                    return false;
+                }
+            } else {
+                std::cerr << "[MultiDomainRouteManager] Error: network or routeFactory null when auto-creating domain strategy" << std::endl;
+                return false;
+            }
+            // 更新迭代器
+            it = domainStrategyObj.find(srcDomain);
         }
+        
         return it->second->Route(sourceId, sinkId, nodeList, linkList);
     } else {
         // 跨域需求，自动调用BGP
-        // std::lock_guard<std::mutex> lock(mtx);
         if (!bgpStrategy) {
             std::cerr << "[MultiDomainRouteManager] Error: BGP strategy not set" << std::endl;
             return false;
